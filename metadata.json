@@ -1,0 +1,6 @@
+{
+  "name": "OmniBody Training",
+  "description": "An interactive gym and workout application featuring 3D muscle mapping, workout logs, nutrition logs, plate calculator, and gamification.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
