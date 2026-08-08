@@ -12,6 +12,9 @@ export const translations = {
     'calendar.schedule_workout': 'Schedule Workout',
     'calendar.todays_plan': "Today's Plan",
     'calendar.no_plans': 'No workouts planned',
+    'calendar.legend_completed': 'Completed',
+    'calendar.legend_garmin': 'Garmin Sync',
+    'calendar.legend_scheduled': 'Scheduled',
     // ── Common ───────────────────────────────────────────────────
     'common.loading':   'Loading...',
     'common.save':      'Save',
@@ -419,6 +422,9 @@ export const translations = {
     'calendar.schedule_workout': 'جدولة تمرين',
     'calendar.todays_plan':      'خطة اليوم',
     'calendar.no_plans':         'لا توجد تمارين مجدولة',
+    'calendar.legend_completed': 'مكتمل',
+    'calendar.legend_garmin':    'مزامنة Garmin',
+    'calendar.legend_scheduled': 'مجدول',
 
     // ── Common ───────────────────────────────────────────────────
     'common.loading':   'جاري التحميل...',
