@@ -14,6 +14,7 @@ import html2canvas from 'html2canvas';
 import { useT } from '../hooks/useT';
 import { Capacitor } from '@capacitor/core';
 import { Share } from '@capacitor/share';
+import HealthDashboard from '../components/HealthDashboard';
 
 // ── XP Level Bar ──────────────────────────────────────────────────────────────
 const XPBar = ({ xp, level }: { xp: number; level: number }) => {
@@ -407,6 +408,9 @@ const Dashboard = () => {
 
       {/* Daily Insight */}
       <DailyInsight />
+
+      {/* Health (steps / sleep / heart / Health Score) */}
+      <HealthDashboard />
 
       {/* Stats Row */}
       <div className="stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', marginBottom: '1.25rem' }}>

@@ -5,6 +5,8 @@ import { useUserStore } from '../store/useUserStore';
 import { useWorkoutStore } from '../store/useWorkoutStore';
 import { useGamificationStore } from '../store/useGamificationStore';
 import { useDeviceStore } from '../store/useDeviceStore';
+import { useHealthStore } from '../store/useHealthStore';
+import { useAppLockStore } from '../store/useAppLockStore';
 import { useNutritionStore } from '../store/useNutritionStore';
 import { useMeasurementsStore } from '../store/useMeasurementsStore';
 import type { MeasurementEntry } from '../db/db';
@@ -16,13 +18,11 @@ import { format } from 'date-fns';
 import {
   Download, Upload, Save, Trophy, Plus, ShieldAlert, Watch, Activity,
   HeartPulse, ShieldCheck, Globe, ChevronUp, ChevronDown, Camera, X, Loader2,
-  Pill, Trash2, HelpCircle
+  Pill, Trash2, HelpCircle, Fingerprint
 } from 'lucide-react';
 import { useT } from '../hooks/useT';
 import { useLanguageStore } from '../store/useLanguageStore';
 import { Capacitor } from '@capacitor/core';
-import { Share } from '@capacitor/share';
-import db from '../db/db';
 
 // ── Custom Recharts Tooltip ───────────────────────────────────────────────────
 const ChartTooltip = ({ active, payload, label }: any) => {
@@ -206,40 +206,24 @@ const GarminConnectButton = () => {
   const { isConnected, deviceName, setConnected, setCurrentHR } = useDeviceStore();
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const charRef = useRef<any>(null);
 
   const handleConnect = async () => {
     setError(null);
-    if (!('bluetooth' in navigator)) {
-      setError(t('profile.bluetooth_unsupported'));
-      return;
-    }
     setScanning(true);
     try {
-      const device = await (navigator as any).bluetooth.requestDevice({
-        filters: [{ services: ['heart_rate'] }],
-        optionalServices: ['heart_rate'],
-      });
-      const server = await device.gatt.connect();
-      const service = await server.getPrimaryService('heart_rate');
-      const characteristic = await service.getCharacteristic('heart_rate_measurement');
-      charRef.current = characteristic;
-      await characteristic.startNotifications();
-      characteristic.addEventListener('characteristicvaluechanged', (e: any) => {
-        const value = e.target.value;
-        const flags = value.getUint8(0);
-        const is16bit = flags & 0x1;
-        const hr = is16bit ? value.getUint16(1, true) : value.getUint8(1);
-        setCurrentHR(hr);
-      });
-      device.addEventListener('gattserverdisconnected', () => { setScanning(false); });
-      setConnected(device.name || 'Garmin Device');
+      const { connectHeartRateMonitor } = await import('../services/bleService');
+      const { deviceId, deviceName } = await connectHeartRateMonitor(
+        (hr) => setCurrentHR(hr),
+        () => useDeviceStore.getState().setDisconnected()
+      );
+      setConnected(deviceName, deviceId);
       setScanning(false);
       navigate('/device-live');
     } catch (err: any) {
       setScanning(false);
-      if (err.name !== 'NotFoundError') {
-        setError(t('profile.connection_failed') + ': ' + (err.message || t('profile.unknown_error')));
+      // User simply closed the device picker — not a real error.
+      if (err?.name !== 'NotFoundError' && !/cancell?ed/i.test(err?.message || '')) {
+        setError(t('profile.connection_failed') + ': ' + (err?.message || t('profile.unknown_error')));
       }
     }
   };
@@ -278,30 +262,25 @@ const GarminConnectButton = () => {
   );
 };
 
-// ── Google Fit / Apple Health Sync ─────────────────────────────────────────────
+// ── Apple Health / Health Connect Sync ─────────────────────────────────────────
 const HealthSyncButton = () => {
-  const [syncing, setSyncing] = useState(false);
-  const [lastSync, setLastSync] = useState<string | null>(null);
+  const { authorized, syncing, requestAccess, syncWeek, lastSyncedAt } = useHealthStore();
+  const [error, setError] = useState<string | null>(null);
   const t = useT();
 
   const handleSync = async () => {
-    setSyncing(true);
+    setError(null);
     try {
-      const { syncHealth } = await import('../services/healthService');
-      const data = await syncHealth();
-      if (data.available) {
-        setLastSync(new Date().toLocaleTimeString());
-        alert(`${t('profile.sync_health')}: ${data.steps} ${t('profile.steps_unit')}`);
+      if (!authorized) {
+        const ok = await requestAccess();
+        if (!ok) {
+          setError(Capacitor.isNativePlatform() ? t('profile.connection_failed') : t('profile.health_native_only'));
+        }
       } else {
-        // HealthKit/Health Connect are only reachable from a native iOS/
-        // Android build — a plain web browser can never provide this data,
-        // so we say so plainly instead of silently showing "0 steps".
-        alert(t('profile.health_native_only'));
+        await syncWeek();
       }
-    } catch (err) {
-      // ignore or alert
-    } finally {
-      setSyncing(false);
+    } catch {
+      setError(t('profile.connection_failed'));
     }
   };
 
@@ -316,9 +295,10 @@ const HealthSyncButton = () => {
           cursor: syncing ? 'not-allowed' : 'pointer'
         }}>
         {syncing ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Activity size={14} />}
-        {syncing ? t('profile.syncing') : t('profile.sync_health')}
+        {syncing ? t('profile.syncing') : authorized ? t('profile.sync_health') : t('profile.connect')}
       </button>
-      {lastSync && <span style={{ fontSize: '0.6rem', color: 'var(--color-text-muted)', marginTop: '0.2rem' }}>{t('profile.last_sync')}: {lastSync}</span>}
+      {lastSyncedAt && <span style={{ fontSize: '0.6rem', color: 'var(--color-text-muted)', marginTop: '0.2rem' }}>{t('profile.last_sync')}: {new Date(lastSyncedAt).toLocaleTimeString()}</span>}
+      {error && <span style={{ fontSize: '0.6rem', color: 'var(--magenta)', marginTop: '0.2rem', maxWidth: 160, textAlign: 'end' }}>{error}</span>}
     </div>
   );
 };
@@ -809,6 +789,67 @@ const MeasurementsAndPhotos = () => {
 };
 
 
+// ── Biometric App Lock Toggle ───────────────────────────────────────────────
+const BiometricLockToggle = () => {
+  const t = useT();
+  const { enabled, setEnabled } = useAppLockStore();
+  const [busy, setBusy] = useState(false);
+  const [unavailableReason, setUnavailableReason] = useState<string | null>(null);
+  const isNative = Capacitor.isNativePlatform();
+
+  const handleToggle = async () => {
+    if (!isNative) {
+      setUnavailableReason(t('lock.native_only'));
+      return;
+    }
+    setUnavailableReason(null);
+    if (enabled) {
+      // Turning off never needs a fresh biometric check.
+      setEnabled(false);
+      return;
+    }
+    setBusy(true);
+    try {
+      const { BiometricAuth } = await import('@aparajita/capacitor-biometric-auth');
+      const status = await BiometricAuth.checkBiometry();
+      if (!status.isAvailable) {
+        setUnavailableReason(status.reason || t('lock.not_available'));
+        return;
+      }
+      // Confirm biometry actually works before turning the lock on, so the
+      // user never accidentally locks themselves out.
+      await BiometricAuth.authenticate({ reason: t('lock.confirm_reason') });
+      setEnabled(true);
+    } catch {
+      setUnavailableReason(t('lock.setup_failed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', background: 'rgba(0,0,0,0.3)', borderRadius: 8, marginTop: '1rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <Fingerprint size={18} color="var(--cyan)" />
+        <div>
+          <div style={{ fontWeight: 600 }}>{t('lock.settings_label')}</div>
+          {unavailableReason && <div style={{ fontSize: '0.65rem', color: 'var(--magenta)', marginTop: '0.2rem', maxWidth: 220 }}>{unavailableReason}</div>}
+        </div>
+      </div>
+      <button onClick={handleToggle} disabled={busy}
+        style={{
+          width: 46, height: 26, borderRadius: 13, position: 'relative', flexShrink: 0,
+          background: enabled ? 'var(--cyan)' : 'rgba(255,255,255,0.15)', transition: 'background 0.2s',
+        }}>
+        <span style={{
+          position: 'absolute', top: 3, insetInlineStart: enabled ? 23 : 3,
+          width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'inset-inline-start 0.2s',
+        }} />
+      </button>
+    </div>
+  );
+};
+
 const Profile = () => {
   const userStore = useUserStore();
   const startWalkthrough = useOnboardingStore(s => s.startWalkthrough);
@@ -819,6 +860,8 @@ const Profile = () => {
   const { lang, toggleLang } = useLanguageStore();
 
   const [newWeight, setNewWeight] = useState('');
+  const [exportBusy, setExportBusy] = useState<string | null>(null);
+  const [importBusy, setImportBusy] = useState(false);
   const [tab, setTab] = useState<'stats' | 'trophies' | 'history'>('trophies');
   const [showEditModal, setShowEditModal] = useState(false);
 
@@ -879,49 +922,68 @@ const Profile = () => {
 
   const handleExport = async () => {
     const activeUserId = userStore.activeUserId || 'default_user';
+    setExportBusy('json');
+    try {
+      const { exportUserDataJSON } = await import('../services/dataExportService');
+      await exportUserDataJSON(activeUserId);
+    } catch (err) {
+      console.error('Export failed', err);
+      alert(t('profile.export_failed'));
+    } finally {
+      setExportBusy(null);
+    }
+  };
 
-    const user = await db.users.get(activeUserId);
-    const dailyLogs = await db.daily_logs.where('userId').equals(activeUserId).toArray();
-    const workouts = await db.workouts.where('userId').equals(activeUserId).toArray();
-    const customExercises = await db.custom_exercises.where('userId').equals(activeUserId).toArray();
-    const injuries = await db.injuries.where('userId').equals(activeUserId).toArray();
-    const customFoods = await db.custom_foods.where('userId').equals(activeUserId).toArray();
-
-    const data = { user, dailyLogs, workouts, customExercises, injuries, customFoods };
-    const jsonString = JSON.stringify(data, null, 2);
-    const fileName = `omnibody-backup-${format(new Date(), 'yyyy-MM-dd')}.json`;
-
-    if (Capacitor.isNativePlatform()) {
-      try {
-        const { Filesystem, Directory } = await import('@capacitor/filesystem');
-        await Filesystem.writeFile({ path: fileName, data: btoa(unescape(encodeURIComponent(jsonString))), directory: Directory.Cache });
-        const fileUri = await Filesystem.getUri({ directory: Directory.Cache, path: fileName });
-        await Share.share({ title: 'OmniBody Backup', text: 'My OmniBody data backup', url: fileUri.uri, dialogTitle: 'Export Data' });
-      } catch (err) { console.error('Export failed', err); }
-    } else {
-      const blob = new Blob([jsonString], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = fileName; a.click();
-      URL.revokeObjectURL(url);
+  const handleExportCSV = async (kind: 'workouts' | 'nutrition' | 'measurements' | 'weight') => {
+    const activeUserId = userStore.activeUserId || 'default_user';
+    setExportBusy(kind);
+    try {
+      const svc = await import('../services/dataExportService');
+      const fn = {
+        workouts: svc.exportWorkoutsCSV,
+        nutrition: svc.exportNutritionCSV,
+        measurements: svc.exportMeasurementsCSV,
+        weight: svc.exportWeightHistoryCSV,
+      }[kind];
+      await fn(activeUserId);
+    } catch (err) {
+      console.error('CSV export failed', err);
+      alert(t('profile.export_failed'));
+    } finally {
+      setExportBusy(null);
     }
   };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || importBusy) return;
+    setImportBusy(true);
     const reader = new FileReader();
-    reader.onload = ev => {
+    reader.onload = async ev => {
       try {
         const data = JSON.parse(ev.target?.result as string);
-        // TODO: Update import logic for new Dexie DB schema
-        // if (data.user) userStore.importData(data.user);
-        // if (data.workout) workoutStore.importData(data.workout);
-        // if (data.nutrition) nutritionStore.importData(data.nutrition);
-        if (data.gamification) gamification.importData(data.gamification);
-        alert('Data restored successfully!');
-      } catch { alert('Invalid backup file. Please try again.'); }
+        const { isValidUserDataExport, importUserDataJSON } = await import('../services/dataExportService');
+        if (!isValidUserDataExport(data)) {
+          alert(t('profile.import_invalid'));
+          return;
+        }
+        const activeUserId = userStore.activeUserId || 'default_user';
+        if (!confirm(t('profile.import_confirm'))) return;
+        await importUserDataJSON(data, activeUserId);
+        // Reload every store from the freshly-written Dexie tables so the
+        // UI reflects the restored data immediately, without a manual reload.
+        const { loadAllUserData } = await import('../store/sessionLoader');
+        await loadAllUserData(activeUserId);
+        alert(t('profile.import_success'));
+      } catch (err) {
+        console.error('Import failed', err);
+        alert(t('profile.import_invalid'));
+      } finally {
+        setImportBusy(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
     };
+    reader.onerror = () => { setImportBusy(false); alert(t('profile.import_invalid')); };
     reader.readAsText(file);
   };
 
@@ -1246,24 +1308,44 @@ const Profile = () => {
             {t('walkthrough.replay_button')}
           </button>
         </div>
+        <BiometricLockToggle />
       </div>
 
       {/* Data Management */}
       <div className="glass-card animate-fade-up" style={{ padding: '1.5rem', marginBottom: '1.25rem' }}>
         <div className="section-label">{t('profile.data_backup')}</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          <button onClick={handleExport} className="btn-secondary" style={{ width: '100%', padding: '1rem' }}>
-            <Download size={18} /> {t('profile.export_json')}
+          <button onClick={handleExport} disabled={!!exportBusy || importBusy} className="btn-secondary" style={{ width: '100%', padding: '1rem' }}>
+            {exportBusy === 'json' ? <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> : <Download size={18} />} {t('profile.export_json')}
           </button>
           <input type="file" accept=".json" ref={fileInputRef} onChange={handleImport} style={{ display: 'none' }} />
-          <button onClick={() => fileInputRef.current?.click()}
+          <button onClick={() => fileInputRef.current?.click()} disabled={!!exportBusy || importBusy}
             style={{
               width: '100%', padding: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
               background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 'var(--radius-md)',
               color: 'var(--color-text-muted)', fontFamily: 'var(--font-body)', fontSize: '0.9rem', fontWeight: 600, transition: 'all 0.2s',
             }}>
-            <Upload size={18} /> {t('profile.import_json')}
+            {importBusy ? <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> : <Upload size={18} />} {t('profile.import_json')}
           </button>
+
+          <div style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>{t('profile.csv_hint')}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+            {([
+              ['workouts', t('profile.csv_workouts')],
+              ['nutrition', t('profile.csv_nutrition')],
+              ['measurements', t('profile.csv_measurements')],
+              ['weight', t('profile.csv_weight')],
+            ] as const).map(([kind, label]) => (
+              <button key={kind} onClick={() => handleExportCSV(kind)} disabled={!!exportBusy || importBusy}
+                style={{
+                  padding: '0.6rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
+                  background: 'rgba(0,240,255,0.05)', border: '1px solid rgba(0,240,255,0.15)', borderRadius: 8,
+                  color: 'var(--cyan)', fontSize: '0.72rem', fontWeight: 600,
+                }}>
+                {exportBusy === kind ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Download size={13} />} {label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

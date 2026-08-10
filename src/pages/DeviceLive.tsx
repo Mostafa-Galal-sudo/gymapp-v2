@@ -118,9 +118,16 @@ const DeviceLive = () => {
     if (session) setFinishedSession(session);
   };
 
-  const handleDisconnect = () => {
+  const handleDisconnect = async () => {
+    const { deviceId } = useDeviceStore.getState();
     setDisconnected();
     navigate('/profile');
+    try {
+      const { disconnectHeartRateMonitor } = await import('../services/bleService');
+      await disconnectHeartRateMonitor(deviceId);
+    } catch {
+      // best-effort — the app state is already cleared either way
+    }
   };
 
   const zoneIdx = currentHR ? getZone(currentHR) : 0;

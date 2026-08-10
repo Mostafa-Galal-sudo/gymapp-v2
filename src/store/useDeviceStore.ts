@@ -24,13 +24,14 @@ export interface DeviceSession {
 interface DeviceState {
   isConnected: boolean;
   deviceName: string | null;
+  deviceId: string | null;
   currentHR: number | null;
   sessionActive: boolean;
   sessionStart: number | null;
   liveHRData: { time: number; hr: number }[];
   sessions: DeviceSession[];
 
-  setConnected: (deviceName: string) => void;
+  setConnected: (deviceName: string, deviceId?: string) => void;
   setDisconnected: () => void;
   setCurrentHR: (hr: number) => void;
   startSession: () => void;
@@ -65,17 +66,19 @@ export const useDeviceStore = create<DeviceState>()(
     (set, get) => ({
       isConnected: false,
       deviceName: null,
+      deviceId: null,
       currentHR: null,
       sessionActive: false,
       sessionStart: null,
       liveHRData: [],
       sessions: [],
 
-      setConnected: (deviceName) => set({ isConnected: true, deviceName }),
+      setConnected: (deviceName, deviceId) => set({ isConnected: true, deviceName, deviceId: deviceId ?? null }),
 
       setDisconnected: () => set({
         isConnected: false,
         deviceName: null,
+        deviceId: null,
         currentHR: null,
         sessionActive: false,
         sessionStart: null,
@@ -133,6 +136,14 @@ export const useDeviceStore = create<DeviceState>()(
 
       importData: (data) => set({ sessions: data.sessions || [] }),
     }),
-    { name: 'omnibody-device-storage' }
+    {
+      name: 'omnibody-device-storage',
+      // Only the historical session log should survive a restart — live
+      // connection state (isConnected/deviceId/currentHR/liveHRData) reflects
+      // a real BLE link that's gone the moment the app process is killed.
+      // Persisting it left the UI showing a phantom "connected" state with a
+      // frozen heart rate on next launch.
+      partialize: (state) => ({ sessions: state.sessions }),
+    }
   )
 );

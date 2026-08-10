@@ -32,4 +32,18 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Bluetooth (heart-rate monitor / smartwatch connection) -->
+    <!-- Android 12+ (API 31+): scoped runtime BLE permissions. We only ever
+         read heart-rate data and never use scan results to infer location,
+         so we assert neverForLocation and skip requesting ACCESS_FINE_LOCATION. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- Android 11 and below: legacy Bluetooth permissions -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
+
+    <!-- Declared as optional so the app still installs on devices without BLE hardware -->
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
 </manifest>

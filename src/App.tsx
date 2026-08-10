@@ -7,6 +7,7 @@ import { useOnboardingStore } from './store/useOnboardingStore';
 import { loadAllUserData } from './store/sessionLoader';
 import MainLayout from './components/layout/MainLayout';
 import { MigrationGate } from './components/MigrationGate';
+import AppLockGate from './components/AppLockGate';
 import Walkthrough from './components/Walkthrough';
 
 import Auth from './pages/Auth';
@@ -93,10 +94,12 @@ function App() {
           <Auth />
         </div>
       ) : (
-        <BrowserRouter>
-          <AppRouter />
-          <Walkthrough />
-        </BrowserRouter>
+        <AppLockGate>
+          <BrowserRouter>
+            <AppRouter />
+            <Walkthrough />
+          </BrowserRouter>
+        </AppLockGate>
       )}
     </MigrationGate>
   );
