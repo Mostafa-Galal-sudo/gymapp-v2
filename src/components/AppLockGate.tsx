@@ -87,55 +87,68 @@ const AppLockGate = ({ children }: { children: React.ReactNode }) => {
     return () => { listener.then(l => l.remove()); };
   }, [enabled, isNative]);
 
-  if (!enabled || !isNative || unlocked) return <>{children}</>;
+  if (!enabled || !isNative) return <>{children}</>;
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 9999,
-      background: 'var(--bg-base, #0a0e1a)',
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      gap: '1.25rem', padding: '2rem', textAlign: 'center',
-    }}>
-      <div style={{
-        width: 84, height: 84, borderRadius: '50%',
-        background: 'linear-gradient(135deg, var(--cyan), var(--magenta))',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        boxShadow: 'var(--shadow-cyan)',
-      }}>
-        <Lock size={36} color="#000" />
-      </div>
-      <div>
-        <div style={{ fontFamily: 'var(--font-heading)', fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.4rem' }}>
-          {t('lock.title')}
-        </div>
-        <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>{t('lock.subtitle')}</div>
-      </div>
-      {error && <div style={{ fontSize: '0.75rem', color: 'var(--magenta)' }}>{error}</div>}
-      <button
-        onClick={attemptUnlock}
-        disabled={authenticating}
-        className="btn-primary"
-        style={{ padding: '0.75rem 1.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-      >
-        <Fingerprint size={18} />
-        {authenticating ? t('common.loading') : t('lock.unlock_button')}
-      </button>
-      {showEscapeHatch && (
-        <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', maxWidth: 260 }}>{t('lock.escape_hint')}</div>
+    <>
+      {/* Children stay mounted at all times — locking must never unmount the
+          app tree, or every page's local component state (open modals, an
+          in-progress form, the walkthrough's current step, a running workout
+          timer, etc.) would reset on every background/foreground cycle. The
+          lock screen is an opaque overlay on top, not a replacement — and its
+          z-index (10001) is deliberately above every other overlay in the app
+          (Walkthrough uses 10000) so the lock screen always wins if the app
+          is backgrounded while something else is open. */}
+      {children}
+      {!unlocked && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 10001,
+          background: 'var(--bg-base, #0a0e1a)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          gap: '1.25rem', padding: '2rem', textAlign: 'center',
+        }}>
+          <div style={{
+            width: 84, height: 84, borderRadius: '50%',
+            background: 'linear-gradient(135deg, var(--cyan), var(--magenta))',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: 'var(--shadow-cyan)',
+          }}>
+            <Lock size={36} color="#000" />
+          </div>
+          <div>
+            <div style={{ fontFamily: 'var(--font-heading)', fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.4rem' }}>
+              {t('lock.title')}
+            </div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>{t('lock.subtitle')}</div>
+          </div>
+          {error && <div style={{ fontSize: '0.75rem', color: 'var(--magenta)' }}>{error}</div>}
           <button
-            onClick={disableLockAndEnter}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem',
-              background: 'transparent', border: '1px solid var(--magenta)', borderRadius: 'var(--radius-md)',
-              color: 'var(--magenta)', fontSize: '0.75rem', fontWeight: 600,
-            }}
+            onClick={attemptUnlock}
+            disabled={authenticating}
+            className="btn-primary"
+            style={{ padding: '0.75rem 1.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
           >
-            <ShieldOff size={14} /> {t('lock.escape_button')}
+            <Fingerprint size={18} />
+            {authenticating ? t('common.loading') : t('lock.unlock_button')}
           </button>
+          {showEscapeHatch && (
+            <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', maxWidth: 260 }}>{t('lock.escape_hint')}</div>
+              <button
+                onClick={disableLockAndEnter}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem',
+                  background: 'transparent', border: '1px solid var(--magenta)', borderRadius: 'var(--radius-md)',
+                  color: 'var(--magenta)', fontSize: '0.75rem', fontWeight: 600,
+                }}
+              >
+                <ShieldOff size={14} /> {t('lock.escape_button')}
+              </button>
+            </div>
+          )}
         </div>
       )}
-    </div>
+    </>
   );
 };
 
