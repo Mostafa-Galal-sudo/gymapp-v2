@@ -26,11 +26,3 @@ dist-ssr
 # Android Keystores
 android/app/*.jks
 android/app/*.keystore
-
-# iOS (Capacitor)
-ios/App/Pods/
-ios/App/build/
-ios/App/output/
-ios/DerivedData/
-*.xcuserstate
-xcuserdata/
