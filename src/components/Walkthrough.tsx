@@ -79,8 +79,36 @@ const Walkthrough = () => {
       return; // re-run once location.pathname updates below
     }
 
-    // Give the DOM a moment to settle after a route change before measuring.
-    let settleTimer: ReturnType<typeof setTimeout> | undefined;
+    let cancelled = false;
+    let cleanupScrollWait: (() => void) | undefined;
+
+    // Page content scrolls inside a nested `.main` div (overflow-y: auto),
+    // not the window — so we can't just wait a fixed number of ms and hope
+    // the scroll (which may need to travel a long way, e.g. past the whole
+    // Health dashboard section) has actually finished. Wait for the
+    // scrollend event where supported, with a timeout fallback for browsers
+    // that don't support it yet.
+    const waitForScrollSettle = (onSettled: () => void) => {
+      const scrollContainer = document.querySelector('main') || window;
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        cleanupScrollWait?.();
+        onSettled();
+      };
+      if ('onscrollend' in window) {
+        scrollContainer.addEventListener('scrollend', finish, { once: true });
+        cleanupScrollWait = () => scrollContainer.removeEventListener('scrollend', finish);
+      }
+      // Always also set a fallback timer — covers browsers without
+      // scrollend support, and the case where nothing needed to scroll at
+      // all (scrollend never fires if there's no scrolling to do).
+      const fallback = setTimeout(finish, 220);
+      const prevCleanup = cleanupScrollWait;
+      cleanupScrollWait = () => { prevCleanup?.(); clearTimeout(fallback); };
+    };
+
     const timer = setTimeout(() => {
       const el = document.querySelector(`[data-walkthrough="${step.target}"]`);
       if (!el || !document.contains(el)) {
@@ -89,18 +117,29 @@ const Walkthrough = () => {
         return;
       }
 
-      // Bring the target into view first (it may be below the fold, e.g.
-      // the scan button further down the Nutrition page), then measure its
-      // on-screen position once scrolling settles.
+      // Bring the target into view first (it may be well below the fold —
+      // e.g. progress-card now sits below the whole Health dashboard
+      // section), then measure its on-screen position once scrolling
+      // has actually settled.
       el.scrollIntoView({ behavior: 'instant' as ScrollBehavior, block: 'center' });
-      settleTimer = setTimeout(() => {
+      waitForScrollSettle(() => {
+        if (cancelled) return;
         const r = getTargetRect(step.target);
         if (r) setRect(r);
-      }, 60);
+        // One more measurement shortly after — catches late layout shifts
+        // (e.g. web fonts finishing, an image loading in) that would
+        // otherwise leave the cutout slightly misaligned from the target.
+        setTimeout(() => {
+          if (cancelled) return;
+          const r2 = getTargetRect(step.target);
+          if (r2) setRect(r2);
+        }, 200);
+      });
     }, 50);
     return () => {
+      cancelled = true;
       clearTimeout(timer);
-      clearTimeout(settleTimer);
+      cleanupScrollWait?.();
     };
   }, [isOpen, stepIndex, location.pathname, navigate, finish]);
 
