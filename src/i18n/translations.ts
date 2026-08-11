@@ -72,6 +72,7 @@ export const translations = {
     'walkthrough.step_profile_desc': 'Manage your stats, goals, injuries, supplements, and app settings here.',
     'common.back':      'Back',
     'common.next':      'Next',
+    'common.continue':  'Continue',
     'common.done':      'Done',
     'common.start':     'Start',
     'common.skip':      'Skip',
@@ -468,6 +469,13 @@ export const translations = {
     'lock.failed': "Authentication failed. Tap Unlock to try again.",
     'lock.escape_hint': "Still can't get in? You can turn off the app lock and set it up again from Settings.",
     'lock.escape_button': 'Turn Off App Lock',
+
+    // ── First-run onboarding ─────────────────────────────────────────
+    'onboarding.step_name_title': "What should we call you?",
+    'onboarding.name_placeholder': 'Enter your name',
+    'onboarding.step_details_title': 'Tell us about yourself',
+    'onboarding.step_goals_title': "What's your goal?",
+    'onboarding.start_button': 'Start',
   },
 
   ar: {
@@ -548,6 +556,7 @@ export const translations = {
     'walkthrough.step_profile_desc': 'تحكم في بياناتك وأهدافك وإصاباتك ومكملاتك وإعدادات التطبيق من هنا.',
     'common.back':      'رجوع',
     'common.next':      'التالي',
+    'common.continue':  'استكمال',
     'common.done':      'تم',
     'common.start':     'ابدأ',
     'common.skip':      'تخطي',
@@ -944,6 +953,13 @@ export const translations = {
     'lock.failed': 'فشل التحقق. دوس افتح عشان تجرب تاني.',
     'lock.escape_hint': 'لسه مش عارف تدخل؟ تقدر تقفل ميزة القفل وتظبطها تاني من الإعدادات.',
     'lock.escape_button': 'قفّل ميزة القفل',
+
+    // ── إعداد أول استخدام ────────────────────────────────────────
+    'onboarding.step_name_title': 'نناديك إيه؟',
+    'onboarding.name_placeholder': 'اكتب اسمك',
+    'onboarding.step_details_title': 'احكيلنا عن نفسك',
+    'onboarding.step_goals_title': 'هدفك إيه؟',
+    'onboarding.start_button': 'ابدأ',
   },
 } as const;
 

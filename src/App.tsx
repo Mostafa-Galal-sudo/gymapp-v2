@@ -7,6 +7,7 @@ import { useOnboardingStore } from './store/useOnboardingStore';
 import { loadAllUserData } from './store/sessionLoader';
 import MainLayout from './components/layout/MainLayout';
 import { MigrationGate } from './components/MigrationGate';
+import LanguageGate from './components/LanguageGate';
 import AppLockGate from './components/AppLockGate';
 import Walkthrough from './components/Walkthrough';
 
@@ -88,20 +89,22 @@ function App() {
   }, [isAuthenticated, hasSeenWalkthrough, startWalkthrough]);
 
   return (
-    <MigrationGate>
-      {!isAuthenticated ? (
-        <div style={{ position: 'relative', minHeight: '100vh', background: 'var(--bg-base)' }}>
-          <Auth />
-        </div>
-      ) : (
-        <AppLockGate>
-          <BrowserRouter>
-            <AppRouter />
-            <Walkthrough />
-          </BrowserRouter>
-        </AppLockGate>
-      )}
-    </MigrationGate>
+    <LanguageGate>
+      <MigrationGate>
+        {!isAuthenticated ? (
+          <div style={{ position: 'relative', minHeight: '100vh', background: 'var(--bg-base)' }}>
+            <Auth />
+          </div>
+        ) : (
+          <AppLockGate>
+            <BrowserRouter>
+              <AppRouter />
+              <Walkthrough />
+            </BrowserRouter>
+          </AppLockGate>
+        )}
+      </MigrationGate>
+    </LanguageGate>
   );
 }
 

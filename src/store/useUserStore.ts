@@ -50,7 +50,7 @@ interface UserState {
   injuries: InjuryEntry[];
   isAuthenticated: boolean;
   loadUser: (userId: string) => Promise<void>;
-  createUser: (userId: string, name: string) => Promise<void>;
+  createUser: (userId: string, profileInput: Partial<UserProfile> & { name: string }) => Promise<void>;
   logout: () => void;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
   logWeight: (weight: number) => Promise<void>;
@@ -142,13 +142,13 @@ export const useUserStore = create<UserState>()((set, get) => ({
       const { scheduleSupplementReminders } = await import('../services/notificationService');
       await scheduleSupplementReminders(finalSupplements);
     } else {
-      await get().createUser(id, 'User');
+      await get().createUser(id, { name: 'User' });
     }
   },
 
-  createUser: async (userId: string, name: string) => {
+  createUser: async (userId: string, profileInput: Partial<UserProfile> & { name: string }) => {
     const id = userId || 'default_user';
-    const profile = { ...cloneDefaultProfile(), name };
+    const profile = { ...cloneDefaultProfile(), ...profileInput };
     const supplements = cloneDefaultSupplements();
     const weightHistory = [{ date: Date.now(), weight: profile.weight }];
     await db.users.put({
