@@ -1,3 +1,5 @@
+import type { DeviceSession } from '../store/useDeviceStore';
+import type { WorkoutSession, ScheduledSession } from '../store/useWorkoutStore';
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useWorkoutStore } from '../store/useWorkoutStore';
@@ -138,9 +140,9 @@ const CalendarPage = () => {
 };
 
 // ── Device Session Card ───────────────────────────────────────────────────────
-const DeviceSessionCard = ({ session }: { session: any }) => {
+const DeviceSessionCard = ({ session }: { session: DeviceSession }) => {
   const t = useT();
-  const zonesWithTime = session.zones?.filter((z: any) => z.minutes > 0) ?? [];
+  const zonesWithTime = session.zones?.filter((z) => z.minutes > 0) ?? [];
   return (
     <div style={{ background: 'rgba(255,0,85,0.05)', border: '1px solid rgba(255,0,85,0.2)', borderRadius: '12px', padding: '1rem', marginBottom: '1rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
@@ -159,7 +161,7 @@ const DeviceSessionCard = ({ session }: { session: any }) => {
       </div>
       {zonesWithTime.length > 0 && (
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          {zonesWithTime.map((z: any, i: number) => (
+          {zonesWithTime.map((z, i: number) => (
             <div key={i} style={{ fontSize: '0.65rem', padding: '0.2rem 0.5rem', borderRadius: '999px', background: `${z.color}20`, color: z.color, border: `1px solid ${z.color}40` }}>
               {z.name} · {z.minutes.toFixed(1)}{t('device.min_short')}
             </div>
@@ -172,7 +174,7 @@ const DeviceSessionCard = ({ session }: { session: any }) => {
 import { useUserStore } from '../store/useUserStore';
 
 // ── Day Modal (3 tabs: Workouts | Nutrition | Health) ─────────────────────────
-const DayModal = ({ date, onClose, dayStatus, scheduleSession, removeScheduledSession, templates }: any) => {
+const DayModal = ({ date, onClose, dayStatus, scheduleSession, removeScheduledSession, templates }: {date:Date;onClose:()=>void;dayStatus:{completed:WorkoutSession[];scheduled:ScheduledSession[];deviceSessions:DeviceSession[]};scheduleSession:(date:string,type:string,ids:string[])=>void;removeScheduledSession:(id:string)=>void;templates:Record<string,string[]>}) => {
   const t = useT();
   const [view, setView] = useState<'list' | 'add'>('list');
   const [activeTab, setActiveTab] = useState<'workouts' | 'nutrition' | 'health'>('workouts');
@@ -224,7 +226,7 @@ const DayModal = ({ date, onClose, dayStatus, scheduleSession, removeScheduledSe
                     {t('calendar.no_plans') || 'No workouts planned.'}
                   </div>
                 )}
-                {dayStatus.completed.map((session: any) => (
+                {dayStatus.completed.map((session) => (
                   <div key={session.sessionId} style={{ background: 'rgba(0,240,255,0.05)', border: '1px solid rgba(0,240,255,0.2)', borderRadius: '12px', padding: '1rem', marginBottom: '1rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                       <div style={{ fontWeight: 600, color: 'var(--cyan)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -232,15 +234,15 @@ const DayModal = ({ date, onClose, dayStatus, scheduleSession, removeScheduledSe
                       </div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{session.exercises.length} ex · {session.totalVolume}kg</div>
                     </div>
-                    {session.exercises.map((ex: any) => (
+                    {session.exercises.map((ex) => (
                       <div key={ex.exerciseId} style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', borderTop: '1px solid rgba(0,240,255,0.06)', paddingTop: '0.4rem', marginTop: '0.4rem' }}>
                         <span style={{ fontWeight: 600, color: 'var(--color-text)' }}>{ex.exerciseId}</span>
-                        {' '}{ex.sets.filter((s: any) => s.completed).length}/{ex.sets.length} sets
+                        {' '}{ex.sets.filter((s) => s.completed).length}/{ex.sets.length} sets
                       </div>
                     ))}
                   </div>
                 ))}
-                {dayStatus.scheduled.map((session: any) => (
+                {dayStatus.scheduled.map((session) => (
                   <div key={session.id} style={{ background: 'rgba(255,215,0,0.05)', border: '1px solid rgba(255,215,0,0.2)', borderRadius: '12px', padding: '1rem', marginBottom: '1rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ fontWeight: 600, color: 'var(--gold)' }}>{session.type}</div>
@@ -257,7 +259,7 @@ const DayModal = ({ date, onClose, dayStatus, scheduleSession, removeScheduledSe
               <>
                 <div style={{ marginBottom: '1.5rem', fontWeight: 600 }}>Select a template:</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {Object.entries(templates).map(([name, ids]: any) => (
+                  {Object.entries(templates).map(([name, ids]) => (
                     <button key={name} onClick={() => { scheduleSession(dStr, name, ids); setView('list'); }}
                       style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '1rem', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontWeight: 600 }}>{name}</span>
@@ -301,7 +303,7 @@ const DayModal = ({ date, onClose, dayStatus, scheduleSession, removeScheduledSe
                   <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.4rem' }}>{meal.type}</div>
                   {meal.foods.map((food, fi) => (
                     <div key={fi} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: '0.8rem' }}>
-                      <span>{(food as any).nameAr || food.name} <span style={{ color: 'var(--color-text-muted)', fontSize: '0.72rem' }}>({food.amount}{food.unit})</span></span>
+                      <span>{food.nameAr || food.name} <span style={{ color: 'var(--color-text-muted)', fontSize: '0.72rem' }}>({food.amount}{food.unit})</span></span>
                       <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--cyan)', fontSize: '0.75rem' }}>{food.calories}kcal</span>
                     </div>
                   ))}
@@ -316,7 +318,7 @@ const DayModal = ({ date, onClose, dayStatus, scheduleSession, removeScheduledSe
           <>
             {dayStatus.deviceSessions.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>No wearable data for this day.</div>
-            ) : dayStatus.deviceSessions.map((session: any) => (
+            ) : dayStatus.deviceSessions.map((session) => (
               <DeviceSessionCard key={session.id} session={session} />
             ))}
           </>

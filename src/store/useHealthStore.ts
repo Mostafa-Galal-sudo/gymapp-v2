@@ -1,3 +1,4 @@
+import { durableStorage } from '../db/preferences';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Capacitor } from '@capacitor/core';
@@ -80,7 +81,7 @@ export const useHealthStore = create<HealthState>()(
       },
     }),
     {
-      name: 'omnibody-health-storage',
+      storage: durableStorage, name: 'omnibody-health-storage',
       // `syncing`/`error` are transient UI state, not data — if the app is
       // killed mid-sync, a persisted `syncing: true` would leave the sync
       // button permanently stuck/disabled on the next launch.

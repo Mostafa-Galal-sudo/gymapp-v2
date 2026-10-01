@@ -1,7 +1,8 @@
 .layout {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  min-height: 100dvh;
+  padding-top: env(safe-area-inset-top, 0px);
   position: relative;
   z-index: 1;
 }
@@ -24,7 +25,7 @@
   display: flex;
   align-items: stretch;
   justify-content: space-around;
-  background: rgba(2, 4, 8, 0.85);
+  background: #1d2c3e;
   backdrop-filter: blur(24px) saturate(1.5);
   -webkit-backdrop-filter: blur(24px) saturate(1.5);
   border-top: 1px solid rgba(0, 240, 255, 0.1);
@@ -49,13 +50,13 @@
   border: none;
   background: none;
   text-decoration: none;
-  color: rgba(74, 112, 128, 0.8);
-  font-family: 'Inter', sans-serif;
+  color: #b1bfce;
+  font-family: var(--font-body);
   /* fix: صغّر الفونت شوية */
-  font-size: 0.58rem;
+  font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.05em;
-  text-transform: uppercase;
+  text-transform: none;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
   /* fix: منع الـ text من الـ overflow */
@@ -69,8 +70,8 @@
 }
 
 .navItem.active {
-  color: #00F0FF;
-  text-shadow: 0 0 12px rgba(0, 240, 255, 0.6);
+  color: #c9e8f7;
+  text-shadow: none;
 }
 
 .navItem.active::before {
@@ -91,8 +92,8 @@
   align-items: center;
   justify-content: center;
   /* fix: صغّر الـ icon container شوية */
-  width: 28px;
-  height: 28px;
+  width: 54px;
+  height: 32px;
   flex-shrink: 0;
 }
 

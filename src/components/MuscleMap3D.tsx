@@ -1,196 +1,221 @@
-import React, { useState, useMemo, useEffect, Suspense } from 'react';
-import { Canvas } from '@react-three/fiber';
-import * as THREE from 'three';
-import { OrbitControls, useGLTF, Html, Environment, Center } from '@react-three/drei';
-
-const MUSCLES = [
-  'abs', 'adductors', 'biceps', 'brachialis', 'calves', 'chest_lower',
-  'chest_mid', 'chest_upper', 'forearms', 'glutes', 'hamstrings', 'lats',
-  'lowerback', 'midback', 'obliques', 'quads', 'shoulders_front',
-  'shoulders_rear', 'shoulders_side', 'traps', 'triceps', 'upperback'
-];
-
+import {
+  memo,
+  useState,
+  useMemo,
+  useEffect,
+  useCallback,
+  useSyncExternalStore,
+  Component,
+  type ReactNode,
+} from "react";
+import { Canvas, useThree, type ThreeEvent } from "@react-three/fiber";
+import { OrbitControls } from "@react-three/drei";
+import * as THREE from "three";
+import {
+  MUSCLES,
+  preloadModels,
+  getModel,
+  subscribeModels,
+  modelSnapshot,
+} from "../services/modelCache";
+import { useLanguageStore } from "../store/useLanguageStore";
 export interface MuscleMap3DProps {
   workedMuscles?: string[];
   onMuscleClick?: (muscle: string) => void;
 }
-
-const BASE = window.location.origin;
-
-function BodyModel() {
-  const { scene } = useGLTF(`${BASE}/muscles/body.glb`);
-  const clone = useMemo(() => {
-    const c = scene.clone();
-    c.traverse((node) => {
-      if ((node as THREE.Mesh).isMesh) {
-        const mesh = node as THREE.Mesh;
-        if (!mesh.material) {
-          mesh.material = new THREE.MeshStandardMaterial();
-        } else {
-          mesh.material = (mesh.material as THREE.Material).clone();
-        }
-        const mat = mesh.material as THREE.MeshStandardMaterial;
-        mat.color.set('#d1d5db');
-        mat.roughness = 0.6;
-      }
-    });
-    return c;
-  }, [scene]);
-
-  return <primitive object={clone} />;
+const EMPTY: string[] = [];
+class SceneBoundary extends Component<
+  { children: ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    return this.state.failed ? (
+      <p role="alert">
+        3D unavailable on this device / العرض ثلاثي الأبعاد غير متاح
+      </p>
+    ) : (
+      this.props.children
+    );
+  }
 }
-
-interface MuscleMeshProps {
+const Model = memo(function Model({
+  name,
+  highlight,
+  onClick,
+}: {
   name: string;
-  isWorked: boolean;
-  isSelected: boolean;
-  isHovered: boolean;
-  onHover: (name: string | null) => void;
+  highlight: boolean;
   onClick: (name: string) => void;
-}
-
-function MuscleMesh({ name, isWorked, isSelected, isHovered, onHover, onClick }: MuscleMeshProps) {
-  const { scene } = useGLTF(`${BASE}/muscles/${name}.glb`);
-  const clone = useMemo(() => {
-    const c = scene.clone();
-    c.traverse((node) => {
-      if ((node as THREE.Mesh).isMesh) {
-        const mesh = node as THREE.Mesh;
-        if (!mesh.material) {
-          mesh.material = new THREE.MeshStandardMaterial();
-        } else {
-          mesh.material = (mesh.material as THREE.Material).clone();
-        }
-        const mat = mesh.material as THREE.MeshStandardMaterial;
-        mat.polygonOffset = true;
-        mat.polygonOffsetFactor = -1;
-        mat.polygonOffsetUnits = -1;
-        mat.roughness = 0.4;
-      }
-    });
-    return c;
-  }, [scene]);
-
-  useEffect(() => {
+}) {
+  const scene = getModel(name)!.scene,
+    invalidate = useThree((s) => s.invalidate);
+  const { clone, materials } = useMemo(() => {
+    const clone = scene.clone(true),
+      materials: THREE.MeshStandardMaterial[] = [];
     clone.traverse((node) => {
-      if ((node as THREE.Mesh).isMesh) {
-        const mat = (node as THREE.Mesh).material as THREE.MeshStandardMaterial;
-        if (isSelected || isWorked) {
-          mat.color.set('#ef4444');
-          mat.transparent = false;
-          mat.opacity = 1;
-          mat.depthWrite = true;
-        } else if (isHovered) {
-          mat.color.set('#f97316');
-          mat.transparent = false;
-          mat.opacity = 1;
-          mat.depthWrite = true;
-        } else {
-          mat.color.set('#d1d5db');
-          mat.transparent = false;
-          mat.opacity = 1;
-          mat.depthWrite = true;
-        }
-        mat.needsUpdate = true;
+      if (node instanceof THREE.Mesh) {
+        const create = (source: THREE.Material) => {
+          const m = source.clone() as THREE.MeshStandardMaterial;
+          m.color?.set("#cbd7de");
+          m.roughness = 0.65;
+          if (name !== "body") {
+            m.polygonOffset = true;
+            m.polygonOffsetFactor = -1;
+            m.polygonOffsetUnits = -1;
+          }
+          materials.push(m);
+          return m;
+        };
+        node.material = Array.isArray(node.material)
+          ? node.material.map(create)
+          : create(node.material);
       }
     });
-  }, [clone, isWorked, isSelected, isHovered]);
-
+    return { clone, materials };
+  }, [scene, name]);
+  useEffect(() => {
+    materials.forEach((m) => m.color?.set(highlight ? "#edb582" : "#cbd7de"));
+    invalidate();
+  }, [materials, highlight, invalidate]);
+  useEffect(() => () => materials.forEach((m) => m.dispose()), [materials]);
+  const click = useCallback(
+    (e: ThreeEvent<MouseEvent>) => {
+      e.stopPropagation();
+      if (name !== "body") onClick(name);
+    },
+    [name, onClick],
+  );
+  return <primitive object={clone} dispose={null} onClick={click} />;
+});
+function Scene({
+  loaded,
+  selected,
+  worked,
+  onClick,
+}: {
+  loaded: string[];
+  selected: string | null;
+  worked: string[];
+  onClick: (name: string) => void;
+}) {
+  const body = getModel("body");
+  const transform = useMemo(() => {
+    if (!body) return null;
+    const box = new THREE.Box3().setFromObject(body.scene),
+      size = box.getSize(new THREE.Vector3()),
+      center = box.getCenter(new THREE.Vector3());
+    return { scale: 2.6 / size.y, center };
+  }, [body]);
+  if (!transform) return null;
   return (
-    <primitive
-      object={clone}
-      onPointerOver={(e: any) => {
-        e.stopPropagation();
-        onHover(name);
-      }}
-      onPointerOut={(e: any) => {
-        e.stopPropagation();
-        onHover(null);
-      }}
-      onClick={(e: any) => {
-        e.stopPropagation();
-        onClick(name);
-      }}
-    />
+    <group scale={transform.scale}>
+      <group
+        position={[
+          -transform.center.x,
+          -transform.center.y,
+          -transform.center.z,
+        ]}
+      >
+        {loaded.map((name) => (
+          <Model
+            key={name}
+            name={name}
+            highlight={selected === name || worked.includes(name)}
+            onClick={onClick}
+          />
+        ))}
+      </group>
+    </group>
   );
 }
-
-export function MuscleMap3D({ workedMuscles = [], onMuscleClick }: MuscleMap3DProps) {
-  const [hoveredMuscle, setHoveredMuscle] = useState<string | null>(null);
-  const [selectedMuscle, setSelectedMuscle] = useState<string | null>(null);
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-
-  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    setMousePos({ x: e.clientX, y: e.clientY });
-  };
-
-  const handleClick = (name: string) => {
-    setSelectedMuscle(name);
-    if (onMuscleClick) {
-      onMuscleClick(name);
-    }
-  };
-
-  const formatMuscleName = (name: string) => {
-    return name.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-  };
-
+export function MuscleMap3D({
+  workedMuscles = EMPTY,
+  onMuscleClick,
+}: MuscleMap3DProps) {
+  const state = useSyncExternalStore(subscribeModels, modelSnapshot),
+    [selected, setSelected] = useState<string | null>(null),
+    ar = useLanguageStore((s) => s.lang) === "ar";
+  useEffect(() => {
+    void preloadModels().catch(() => undefined);
+  }, []);
+  const click = useCallback(
+    (name: string) => {
+      setSelected(name);
+      onMuscleClick?.(name);
+    },
+    [onMuscleClick],
+  );
   return (
     <div
-      style={{ position: 'relative', width: '100%', height: '100%', cursor: hoveredMuscle ? 'pointer' : 'default' }}
-      onPointerMove={handlePointerMove}
+      style={{
+        position: "relative",
+        width: "100%",
+        height: "100%",
+        minHeight: 320,
+      }}
     >
-      <Canvas
-        style={{ width: '100%', height: '100%' }}
-        camera={{ position: [0, 0, 1.5], fov: 75 }}
-      >
-        <ambientLight intensity={0.7} />
-        <directionalLight position={[5, 10, 5]} intensity={1.5} />
-        <directionalLight position={[-5, 5, -5]} intensity={0.8} />
-        <Environment preset="city" />
-
-        <Suspense fallback={<Html center><div style={{ color: '#00F0FF', fontWeight: 600 }}>Loading...</div></Html>}>
-          <Center>
-            <group scale={10}>
-              <BodyModel />
-              {MUSCLES.map((muscle) => (
-                <MuscleMesh
-                  key={muscle}
-                  name={muscle}
-                  isWorked={workedMuscles.includes(muscle)}
-                  isSelected={selectedMuscle === muscle}
-                  isHovered={hoveredMuscle === muscle}
-                  onHover={setHoveredMuscle}
-                  onClick={handleClick}
-                />
-              ))}
-            </group>
-          </Center>
-        </Suspense>
-
-        <OrbitControls
-          makeDefault
-          target={[0, 0, 0]}
-          enablePan={false}
-          minDistance={0.5}
-          maxDistance={8}
-          enableZoom={true}
-        />
-      </Canvas>
-
-      {hoveredMuscle && (
-        <div
-          className="fixed pointer-events-none z-50 bg-gray-900 text-white px-3 py-1.5 rounded-lg text-sm font-medium shadow-lg transform -translate-x-1/2 -translate-y-full transition-opacity duration-150"
-          style={{
-            left: mousePos.x,
-            top: mousePos.y - 20
-          }}
+      <SceneBoundary>
+        <Canvas
+          frameloop="demand"
+          dpr={[1, 1.5]}
+          gl={{ antialias: true, powerPreference: "low-power" }}
+          camera={{ position: [0, 0, 3.2], fov: 50 }}
         >
-          {formatMuscleName(hoveredMuscle)}
+          <ambientLight intensity={1.4} />
+          <directionalLight position={[3, 4, 5]} intensity={2} />
+          <directionalLight position={[-3, 2, -4]} intensity={1} />
+          <Scene
+            loaded={state.loaded}
+            selected={selected}
+            worked={workedMuscles}
+            onClick={click}
+          />
+          <OrbitControls
+            makeDefault
+            enablePan={false}
+            minDistance={1.8}
+            maxDistance={5}
+          />
+        </Canvas>
+      </SceneBoundary>
+      {state.loaded.length < MUSCLES.length + 1 && (
+        <div className="model-progress" role="status">
+          <span>
+            {ar ? "تحميل العضلات" : "Loading anatomy"} {state.loaded.length}/
+            {MUSCLES.length + 1}
+          </span>
+          <progress max={MUSCLES.length + 1} value={state.loaded.length} />
+          {state.error && (
+            <button
+              className="btn"
+              onClick={() => void preloadModels().catch(() => undefined)}
+            >
+              {ar ? "إعادة المحاولة" : "Retry"}
+            </button>
+          )}
         </div>
       )}
+      <div className="model-selector">
+        <select
+          aria-label={ar ? "اختر عضلة" : "Select muscle"}
+          value={selected || ""}
+          onChange={(e) => click(e.target.value)}
+        >
+          <option disabled value="">
+            {ar ? "اختر عضلة أو اضغط عليها" : "Select or tap a muscle"}
+          </option>
+          {MUSCLES.map((name) => (
+            <option value={name} key={name}>
+              {name.replaceAll("_", " ")}
+            </option>
+          ))}
+        </select>
+      </div>
     </div>
   );
 }
-
 export default MuscleMap3D;

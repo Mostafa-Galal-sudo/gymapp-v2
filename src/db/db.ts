@@ -1,8 +1,9 @@
 import Dexie, { type EntityTable } from 'dexie';
 import { type UserProfile, type Supplement, type WeightEntry } from '../store/useUserStore';
-import { type WorkoutSession } from '../store/useWorkoutStore';
+import { type WorkoutSession, type ScheduledSession } from '../store/useWorkoutStore';
 import { type CustomExercise } from '../store/useExerciseStore';
 import { type Meal } from '../store/useNutritionStore';
+import { type Food } from '../food/model';
 
 export interface InjuryEntry {
   id: string;
@@ -22,15 +23,17 @@ export interface UserEntity {
   gamification?: {
     xp: number;
     level: number;
-    badges: any[]; // we'll use any to avoid circular imports, or just import Badge from GamificationStore
+    badges: import('../store/useGamificationStore').Badge[];
   };
   exercisePrefs?: {
     favorites: string[];
-    templates: any[];
+    templates: import('../store/useExerciseStore').WorkoutTemplate[];
   };
 }
 
 export interface DailyLogEntity {
+  supplementPlan?: Record<string, { name: string; doses: number }>;
+  targets?: Record<string, number>;
   id: string; // Composite key: `${userId}_${date}`
   userId: string;
   date: number; // Start of day timestamp
@@ -57,6 +60,7 @@ export interface CustomFood {
 }
 
 export interface MeasurementEntry {
+  values?: Record<string, number>;
   id: string;
   userId: string;
   date: number;
@@ -85,7 +89,7 @@ export interface Recipe {
   userId: string;
   name: string;
   nameAr?: string;
-  items: { foodId: string; amount: number }[];
+  items: { foodId: string; amount: number; snapshot?: import('../store/useNutritionStore').LoggedFood }[];
   createdAt: number;
 }
 
@@ -103,6 +107,11 @@ const db = new Dexie('OmnibodyDB_V2') as Dexie & {
   measurements: EntityTable<MeasurementEntry, 'id'>;
   progress_photos: EntityTable<ProgressPhoto, 'id'>;
   recipes: EntityTable<Recipe, 'id'>;
+  active_workouts: EntityTable<{ userId: string; session: WorkoutSession }, 'userId'>;
+  schedules: EntityTable<ScheduledSession & { userId: string }, 'id'>;
+  preferences: EntityTable<{ id: string; value: string }, 'id'>;
+  foods: EntityTable<Food, 'id'>;
+  food_searches: EntityTable<{ query: string; foodIds: string[]; fetchedAt: number }, 'query'>;
 };
 
 // Schema version 2 (V2)
@@ -145,6 +154,43 @@ db.version(5).stores({
   measurements: 'id, userId, date',
   progress_photos: 'id, userId, date',
   recipes: 'id, userId, name'
+});
+
+db.version(6).stores({
+  active_workouts: 'userId',
+  schedules: 'id, userId, date, [userId+date]',
+  preferences: 'id',
+  workouts: 'sessionId, userId, date, [userId+date], type, phase',
+}).upgrade(async tx => {
+  await tx.table('custom_foods').toCollection().modify(food => {
+    food.userId ||= 'default_user';
+  });
+});
+
+db.version(7).stores({ foods: 'id, source, sourceId, userId, name, fetchedAt', food_searches: 'query' }).upgrade(async tx => {
+  const custom = await tx.table('custom_foods').toArray();
+  for (const food of custom) {
+    const keys = ['calories','protein','carbs','fats','fiber','sugar','sodium','potassium'];
+    const nutrients = Object.fromEntries(keys.filter(k => typeof food[k] === 'number').map(k => [k, food[k]]));
+    await tx.table('foods').put({ id: food.id, userId: food.userId || 'default_user', name: food.name, nameAr: food.nameAr,
+      source: 'custom', sourceId: food.id, nutrients, servingSize: food.servingSize || 100, servingUnit: food.servingUnit || 'g', createdAt: 0, updatedAt: 0, fetchedAt: 0 });
+  }
+  await tx.table('daily_logs').toCollection().modify(log => {
+    for (const meal of log.meals || []) for (const food of meal.foods || []) {
+      food.id ||= crypto.randomUUID();
+      food.source ||= 'legacy';
+    }
+  });
+});
+
+db.version(8).stores({ measurements: 'id, userId, date, [userId+date]' }).upgrade(async tx => {
+  await tx.table('measurements').toCollection().modify(row => {
+    row.values ||= {};
+    for (const key of ['weight', 'bodyFat', 'waist', 'chest', 'hips', 'neck', 'arm', 'thigh']) {
+      if (row[key] != null) row.values[key] = row[key];
+    }
+    // Old arm/thigh measurements have no side. Preserve as unpaired legacy values.
+  });
 });
 
 export default db;

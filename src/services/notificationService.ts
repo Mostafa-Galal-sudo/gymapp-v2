@@ -1,5 +1,18 @@
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
+import db from '../db/db';
+
+export async function setWeeklyCheckInReminder(enabled: boolean, arabic: boolean): Promise<boolean> {
+  if (!Capacitor.isNativePlatform()) return false;
+  if (enabled && !(await isNotificationPermissionGranted() || await requestNotificationPermission())) return false;
+  await LocalNotifications.cancel({ notifications: [{ id: 3001 }] });
+  if (enabled) {
+    await LocalNotifications.createChannel({ id: 'check_ins', name: 'Weekly check-in', importance: 3 });
+    await LocalNotifications.schedule({ notifications: [{ id: 3001, title: arabic ? 'المتابعة الأسبوعية' : 'Weekly check-in', body: arabic ? 'سجّل قياساتك عندما تكون مستعداً.' : 'Record your measurements when you are ready.', channelId: 'check_ins', schedule: { on: { weekday: 6, hour: 9, minute: 0 }, repeats: true, allowWhileIdle: false } }] });
+  }
+  await db.preferences.put({ id: 'weekly-check-in-reminder', value: JSON.stringify(enabled) });
+  return true;
+}
 
 const WATER_NOTIFICATION_CHANNEL = 'water_reminders';
 const WATER_NOTIF_IDS = Array.from({ length: 16 }, (_, i) => 1000 + i);
