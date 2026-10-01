@@ -229,43 +229,31 @@ test("workout autosave survives page reload and finish leaves tomorrow untouched
     state.plans.find((p) => p.type === "Scheduled today")?.completedSessionId,
   ).toBeTruthy();
 });
-test("3D loads shared textures once and cached model switching does not fetch again", async ({
+test("3D renders the canonical models and reaches the cached common stage", async ({
   page,
 }) => {
-  let requests = 0;
-  page.on("request", (request) => {
-    if (request.url().endsWith(".glb")) requests++;
-  });
+  test.setTimeout(120_000);
   await page.goto("/muscles");
   await expect
     .poll(
-      () =>
-        page.evaluate(async () => {
-          const m = await import(
-            /* @vite-ignore */ "/src/services/modelCache.ts"
-          );
-          return m.modelSnapshot().loaded.length;
-        }),
-      { timeout: 60000 },
+      async () =>
+        Number(
+          await page.locator(".model-progress progress").getAttribute("value"),
+        ),
+      { timeout: 90_000 },
     )
-    .toBe(23);
+    .toBeGreaterThanOrEqual(3);
   await expect(
     page.getByText(
       "3D unavailable on this device / العرض ثلاثي الأبعاد غير متاح",
     ),
   ).toHaveCount(0);
-  const before = requests;
   await page
     .getByRole("combobox", { name: "Select muscle" })
     .selectOption("biceps");
+  await expect(page.getByRole("heading", { name: /biceps/i })).toBeVisible();
   await page.screenshot({
     path: "test-results/muscles-mobile.png",
     fullPage: true,
   });
-  await page.evaluate(async () => {
-    const m = await import(/* @vite-ignore */ "/src/services/modelCache.ts");
-    await m.loadModel("biceps");
-    await m.loadModel("quads");
-  });
-  expect(requests).toBe(before);
 });

@@ -12,7 +12,7 @@ Completed 2026-10-01. The existing React + TypeScript + Vite + Zustand + Dexie +
 - Analytics is computed in a service layer for 7d/30d/90d/6m/1y/all-time ranges. It covers workout frequency/plans/completion/streaks/misses/sets/reps/volume/muscles/exercises/PRs, stored macros and micronutrients, target adherence, body/weight progress, hydration, supplements, and deterministic daily/weekly/monthly summaries.
 - Insights includes a selectable GitHub-style activity heatmap and complete per-day drilldown. Missing nutrients remain unknown rather than being synthesized.
 - The Android-first journal UI adds five thumb-reachable destinations, safe areas, accessible sheets/dialogs, mobile set entry, offline/loading/empty states, keyboard resize behavior, Android back handling, and English/Arabic RTL layouts.
-- Routes and heavy screens are lazy-loaded. Three.js is isolated from startup, models preload in three stages, concurrent loads are deduplicated, loaded models are cached, Canvas uses demand rendering, and shared resources are disposed safely. Optimized Meshopt GLBs and shared textures reduce the muscle asset tree from about 53.7 MB to 3.5 MB.
+- Routes and heavy screens are lazy-loaded. Three.js is isolated from startup, models preload in three stages, concurrent loads are deduplicated, loaded models are cached, Canvas uses demand rendering, and shared resources are disposed safely. The 23 full-quality, self-contained source GLBs total about 51.24 MB.
 - Backup format v2 validates format, ownership, IDs, dates, numeric ranges, record shapes, workouts, measurements, food occurrences, and preferences before a transaction. Merge retains existing user records and remaps incoming user-owned IDs; replace clears only the selected user's recoverable domains. Device credentials and permissions are excluded.
 - CI runs typecheck, lint, unit tests, production build, browser tests, and the Android build job. Production dependencies audit at zero known vulnerabilities.
 
@@ -24,7 +24,7 @@ Completed 2026-10-01. The existing React + TypeScript + Vite + Zustand + Dexie +
 - Runtime AI scan: clean.
 - `.env.local` ignore check: pass; the personal USDA key is not in tracked files or backups.
 - Live web USDA search was exercised successfully through the server proxy.
-- Web and checked Android 3D asset trees match at 3,504,424 bytes.
+- All 23 web and checked Android GLBs match the supplied canonical source files byte-for-byte.
 - Android-specific imports, native guards, manifest permissions, RTL support, keyboard resize, back behavior, and plugin registration paths were reviewed statically.
 
 ## Device validation checklist
@@ -43,6 +43,6 @@ Completed 2026-10-01. The existing React + TypeScript + Vite + Zustand + Dexie +
 ## Remaining device-dependent risks
 
 - No APK, Gradle build, emulator, or physical-device run was performed in the final phase by request. Health Connect, BLE hardware, biometric prompts, camera behavior, notification delivery, file-provider sharing, process death, WebView GPU/3D behavior, and OEM keyboard/back quirks therefore require the checklist above.
-- The lazy Three.js JavaScript chunk is about 795 kB minified (205 kB gzip). It is excluded from initial route startup, but low-memory device performance still needs measurement.
+- The lazy Three.js JavaScript chunk is about 795 kB minified (205 kB gzip). It is excluded from initial route startup. The full-quality 51.24 MB model set makes low-memory device performance and APK size important device checks.
 - Three.js emits a dependency-level `Clock` deprecation warning during the browser 3D test; it does not fail rendering or caching.
 - USDA `DEMO_KEY` remains a deliberately limited fallback. The supplied personal key is local-only and must be entered on each installed device rather than embedded in the APK.
