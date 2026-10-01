@@ -54,7 +54,7 @@ interface GamificationState {
   badges: Badge[];
   addXP: (amount: number) => Promise<void>;
   unlockBadge: (id: string) => Promise<void>;
-  importData: (data: any) => Promise<void>;
+  importData: (data: Partial<Pick<GamificationState,'xp'|'level'|'badges'>>) => Promise<void>;
   loadUserGamification: (userId: string) => Promise<void>;
 }
 
@@ -116,7 +116,7 @@ export const useGamificationStore = create<GamificationState>()((set, get) => ({
     set({ 
       xp: data.xp || 0, 
       level: data.level || 1, 
-      badges: mergeBadges(data.badges)
+      badges: mergeBadges(data.badges || [])
     });
     await saveGamificationToDb(get());
   }

@@ -1,3 +1,4 @@
+import type { DeviceSession } from '../store/useDeviceStore';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
@@ -21,9 +22,9 @@ const getZone = (hr: number) => {
   return 0;
 };
 
-const SessionSummaryModal = ({ session, onClose }: any) => {
+const SessionSummaryModal = ({ session, onClose }: {session:DeviceSession;onClose:()=>void}) => {
   const t = useT();
-  const ZONE_NAMES = ZONE_KEYS.map(k => t(k as any));
+  const ZONE_NAMES = ZONE_KEYS.map(k => t(k));
   const content = (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 2000,
@@ -58,7 +59,7 @@ const SessionSummaryModal = ({ session, onClose }: any) => {
 
         <div style={{ marginBottom: '1.5rem' }}>
           <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '0.75rem', letterSpacing: '0.1em', textTransform: 'uppercase' }}>{t('device.time_in_zone')}</div>
-          {session.zones.filter((z: any) => z.minutes > 0).map((zone: any, i: number) => (
+          {session.zones.filter((z) => z.minutes > 0).map((zone, i: number) => (
             <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <div style={{ width: 10, height: 10, borderRadius: '50%', background: zone.color }} />
@@ -85,7 +86,7 @@ const SessionSummaryModal = ({ session, onClose }: any) => {
 const DeviceLive = () => {
   const t = useT();
   const navigate = useNavigate();
-  const ZONE_NAMES = ZONE_KEYS.map(k => t(k as any));
+  const ZONE_NAMES = ZONE_KEYS.map(k => t(k));
   const {
     isConnected, deviceName, currentHR,
     sessionActive, liveHRData,
@@ -93,8 +94,8 @@ const DeviceLive = () => {
   } = useDeviceStore();
 
   const [elapsed, setElapsed] = useState(0);
-  const [finishedSession, setFinishedSession] = useState<any>(null);
-  const intervalRef = useRef<any>(null);
+  const [finishedSession, setFinishedSession] = useState<DeviceSession | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
   useEffect(() => {
     if (!isConnected) navigate('/profile');
@@ -210,7 +211,7 @@ const DeviceLive = () => {
               <YAxis domain={[40, 220]} hide />
               <Tooltip
                 contentStyle={{ background: 'rgba(6,9,15,0.95)', border: '1px solid rgba(0,240,255,0.2)', borderRadius: 8, fontSize: '0.8rem' }}
-                formatter={(v: any) => [`${v} bpm`, 'HR']}
+                formatter={(v) => [`${v} bpm`, 'HR']}
               />
               <ReferenceLine y={130} stroke="rgba(251,191,36,0.3)" strokeDasharray="4 4" />
               <ReferenceLine y={160} stroke="rgba(248,113,113,0.3)" strokeDasharray="4 4" />

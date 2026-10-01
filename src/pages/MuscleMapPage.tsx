@@ -1,3 +1,4 @@
+import type { TranslationKey } from '../i18n/translations';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, X, Play, ChevronRight } from 'lucide-react';
@@ -63,7 +64,7 @@ const MuscleMapPage = () => {
           <div className="glass-card" onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '400px', maxHeight: '80vh', overflowY: 'auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.2rem', fontWeight: 700, textTransform: 'capitalize', color: 'var(--cyan)' }}>
-                {t(`muscle.${selectedMuscle}` as any, selectedMuscle.replace('_', ' '))} {t('muscle.exercises')}
+                {t(`muscle.${selectedMuscle}` as TranslationKey, selectedMuscle.replace('_', ' '))} {t('muscle.exercises')}
               </h3>
               <button onClick={() => setSelectedMuscle(null)} style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer' }}>
                 <X size={20} />

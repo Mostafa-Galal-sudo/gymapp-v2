@@ -1,3 +1,4 @@
+import { durableStorage } from '../db/preferences';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
@@ -12,6 +13,6 @@ export const useAppLockStore = create<AppLockState>()(
       enabled: false,
       setEnabled: (enabled) => set({ enabled }),
     }),
-    { name: 'omnibody-app-lock-storage' }
+    { storage: durableStorage, name: 'omnibody-app-lock-storage' }
   )
 );

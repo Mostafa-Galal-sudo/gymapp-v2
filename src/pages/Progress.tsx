@@ -1,3 +1,5 @@
+import type { Exercise } from '../data/exercises';
+import type { WorkoutSession } from '../store/useWorkoutStore';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWorkoutStore } from '../store/useWorkoutStore';
@@ -100,7 +102,7 @@ const VolumeBalanceChart = () => {
   const allEx = getAllExercises();
   const exLookup = new Map(allEx.map(e => [e.id, e]));
 
-  const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const [oneWeekAgo] = useState(() => Date.now() - 7 * 24 * 60 * 60 * 1000);
   const setsByMuscle: Record<string, number> = {};
 
   history.forEach(session => {
@@ -156,8 +158,8 @@ const VolumeBalanceChart = () => {
 const buildReportHtml = (opts: {
   profileName: string;
   records: Record<string, { bestWeight: number; bestReps: number; est1RM: number; date: number }>;
-  exLookup: Map<string, any>;
-  history: any[];
+  exLookup: Map<string, Exercise>;
+  history: WorkoutSession[];
   weekMeals: { date: string; calories: number; protein: number; carbs: number; fats: number }[];
 }) => {
   const { profileName, records, exLookup, history, weekMeals } = opts;
@@ -200,7 +202,7 @@ const buildReportHtml = (opts: {
   <h2>Recent Sessions</h2>
   <table>
     <tr><th>Date</th><th>Type</th><th>Total Volume</th><th>Exercises</th></tr>
-    ${recentSessions.map((s: any) => `<tr><td>${new Date(s.date).toLocaleDateString()}</td><td>${escapeHtml(s.type)}</td><td>${Math.round(s.totalVolume)}kg</td><td>${s.exercises.length}</td></tr>`).join('')}
+    ${recentSessions.map((s) => `<tr><td>${new Date(s.date).toLocaleDateString()}</td><td>${escapeHtml(s.type)}</td><td>${Math.round(s.totalVolume)}kg</td><td>${s.exercises.length}</td></tr>`).join('')}
   </table>
 
   <h2>Nutrition — Last 7 Days</h2>

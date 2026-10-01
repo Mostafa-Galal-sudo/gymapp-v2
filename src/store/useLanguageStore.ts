@@ -1,3 +1,4 @@
+import { durableStorage } from '../db/preferences';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Lang } from '../i18n/translations';
@@ -34,7 +35,7 @@ export const useLanguageStore = create<LanguageState>()(
       },
     }),
     {
-      name: 'omnibody-lang',
+      storage: durableStorage, name: 'omnibody-lang',
       onRehydrateStorage: () => (state) => {
         // Apply dir on app load from persisted state
         if (state?.lang) {

@@ -1,3 +1,5 @@
+import type { UserProfile } from '../store/useUserStore';
+import type { TranslationKey } from '../i18n/translations';
 import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
@@ -25,7 +27,7 @@ import { useLanguageStore } from '../store/useLanguageStore';
 import { Capacitor } from '@capacitor/core';
 
 // ── Custom Recharts Tooltip ───────────────────────────────────────────────────
-const ChartTooltip = ({ active, payload, label }: any) => {
+const ChartTooltip = ({ active, payload, label }: {active?:boolean;payload?:{value?:number|string}[];label?:string|number}) => {
   if (!active || !payload?.length) return null;
   return (
     <div style={{
@@ -152,7 +154,7 @@ const EditProfileModal = ({ onClose }: { onClose: () => void }) => {
           </div>
           <div>
             <label style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', display: 'block', marginBottom: '0.4rem' }}>{t('profile.activity_level')}</label>
-            <select value={form.activityLevel || 'Moderate'} onChange={e => setForm(f => ({ ...f, activityLevel: e.target.value as any }))} style={{ width: '100%' }}>
+            <select value={form.activityLevel || 'Moderate'} onChange={e => setForm(f => ({ ...f, activityLevel: e.target.value as UserProfile['activityLevel'] }))} style={{ width: '100%' }}>
               <option value="Sedentary">{t('profile.activity_sedentary')}</option>
               <option value="Light">{t('profile.activity_light')}</option>
               <option value="Moderate">{t('profile.activity_moderate')}</option>
@@ -179,7 +181,7 @@ const EditProfileModal = ({ onClose }: { onClose: () => void }) => {
                       color: selected ? 'var(--cyan)' : 'var(--color-text-muted)'
                     }}
                   >
-                    {t(`auth.goal.${g}` as any)}
+                    {t(`auth.goal.${g}` as TranslationKey)}
                   </button>
                 );
               })}
@@ -219,11 +221,11 @@ const GarminConnectButton = () => {
       setConnected(deviceName, deviceId);
       setScanning(false);
       navigate('/device-live');
-    } catch (err: any) {
+    } catch (err: unknown) {
       setScanning(false);
       // User simply closed the device picker — not a real error.
-      if (err?.name !== 'NotFoundError' && !/cancell?ed/i.test(err?.message || '')) {
-        setError(t('profile.connection_failed') + ': ' + (err?.message || t('profile.unknown_error')));
+      if (!(err instanceof Error && err.name === 'NotFoundError') && !/cancell?ed/i.test((err instanceof Error ? err.message : '') || '')) {
+        setError(t('profile.connection_failed') + ': ' + ((err instanceof Error ? err.message : String(err)) || t('profile.unknown_error')));
       }
     }
   };
@@ -238,7 +240,7 @@ const GarminConnectButton = () => {
           color: '#22c55e', display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer'
         }}>
         <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', display: 'inline-block', animation: 'pulse 1.5s infinite' }} />
-        {deviceName} · {t('common.open' as any) || 'Open'}
+        {deviceName} · {t('common.open' as TranslationKey) || 'Open'}
       </button>
     );
   }
@@ -358,7 +360,7 @@ const BMICalculatorSection = () => {
             {bmi}
           </span>
           <span style={{ fontSize: '0.85rem', fontWeight: 600, color: bmiCategory.color, padding: '0.2rem 0.6rem', borderRadius: 6, background: `${bmiCategory.color}20` }}>
-            {t(bmiCategory.key as any)}
+            {t(bmiCategory.key as TranslationKey)}
           </span>
         </div>
         {/* BMI Progress bar */}
@@ -591,7 +593,7 @@ const MeasurementsAndPhotos = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSaveMeasurement = () => {
-    const parsed: any = { date: Date.now() };
+    const parsed: Omit<MeasurementEntry,'id'|'userId'> = { date: Date.now() };
     let hasValue = false;
     MEASUREMENT_FIELDS.forEach(f => {
       if (form[f] && !isNaN(parseFloat(form[f]))) {
@@ -623,7 +625,7 @@ const MeasurementsAndPhotos = () => {
     measurements.filter(m => m[f] != null).length >= 2
   );
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
-  const activeMetric = selectedMetric && chartableFields.includes(selectedMetric as any)
+  const activeMetric = selectedMetric && chartableFields.includes(selectedMetric as typeof chartableFields[number])
     ? selectedMetric
     : chartableFields[0];
 
@@ -862,6 +864,7 @@ const Profile = () => {
   const [newWeight, setNewWeight] = useState('');
   const [exportBusy, setExportBusy] = useState<string | null>(null);
   const [importBusy, setImportBusy] = useState(false);
+  const [importMode, setImportMode] = useState<'merge'|'replace'>('merge');
   const [tab, setTab] = useState<'stats' | 'trophies' | 'history'>('trophies');
   const [showEditModal, setShowEditModal] = useState(false);
 
@@ -898,7 +901,7 @@ const Profile = () => {
     const dosesArray = Array(Number(newSupplement.dailyDoses) || 1).fill(false);
     const num = (v: string) => v.trim() === '' ? undefined : parseFloat(v);
     await userStore.addSupplement({
-      id: Math.random().toString(36).substring(2, 9),
+      id: crypto.randomUUID(),
       name: newSupplement.name,
       dose: newSupplement.dose || '1 tab',
       timing: newSupplement.timing || 'Anytime',
@@ -957,6 +960,7 @@ const Profile = () => {
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || importBusy) return;
+    if (file.size > 100 * 1024 * 1024) { alert('Backup exceeds 100 MB'); return; }
     setImportBusy(true);
     const reader = new FileReader();
     reader.onload = async ev => {
@@ -968,8 +972,8 @@ const Profile = () => {
           return;
         }
         const activeUserId = userStore.activeUserId || 'default_user';
-        if (!confirm(t('profile.import_confirm'))) return;
-        await importUserDataJSON(data, activeUserId);
+        if (!confirm(importMode === 'replace' ? (lang === 'ar' ? 'استبدال كل بيانات هذا المستخدم بالنسخة؟ صدّر نسخة أولاً.' : 'Replace all this profile’s data with the backup? Export a backup first.') : (lang === 'ar' ? 'دمج السجلات مع الاحتفاظ ببيانات الأيام الموجودة والملف الحالي؟' : 'Merge records, keeping existing days and the current profile?'))) return;
+        await importUserDataJSON(data, activeUserId, importMode);
         // Reload every store from the freshly-written Dexie tables so the
         // UI reflects the restored data immediately, without a manual reload.
         const { loadAllUserData } = await import('../store/sessionLoader');
@@ -1001,7 +1005,7 @@ const Profile = () => {
   const totalSessions = workoutStore.history.length;
   const totalVolume = workoutStore.history.reduce((a, s) => a + s.totalVolume, 0);
 
-  const TabBtn = ({ id, label }: { id: 'stats' | 'trophies' | 'history'; label: string }) => (
+  const renderTab = ({ id, label }: { id: 'stats' | 'trophies' | 'history'; label: string }) => (
     <button onClick={() => setTab(id)} style={{
       flex: 1, padding: '0.65rem', fontFamily: 'var(--font-heading)',
       fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.08em', textTransform: 'uppercase',
@@ -1064,7 +1068,7 @@ const Profile = () => {
               {profile.age} {t('profile.age')} · {profile.weight}{t('common.kg')} · {profile.height}cm
             </div>
             <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
-              {t('dash.level')} {t(`dash.${profile.level.toLowerCase()}` as any, profile.level)} · {profile.goals.map(g => t(`auth.goal.${g}` as any, g)).join(' · ')}
+              {t('dash.level')} {t(`dash.${profile.level.toLowerCase()}` as TranslationKey, profile.level)} · {profile.goals.map(g => t(`auth.goal.${g}` as TranslationKey, g)).join(' · ')}
             </div>
           </div>
         </div>
@@ -1104,7 +1108,7 @@ const Profile = () => {
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', background: 'rgba(0,0,0,0.3)', borderRadius: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><ShieldCheck size={16} /> {t('profile.whoop')}</div>
-            <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>{t('common.soon' as any) || 'Coming soon'}</span>
+            <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>{t('common.soon' as TranslationKey) || 'Coming soon'}</span>
           </div>
         </div>
       </div>
@@ -1239,9 +1243,9 @@ const Profile = () => {
 
       {/* Tabs */}
       <div style={{ display: 'flex', borderBottom: '1px solid rgba(0,240,255,0.1)', marginBottom: '1.25rem' }}>
-        <TabBtn id="trophies" label={`🏆 ${t('profile.trophies')}`} />
-        <TabBtn id="stats" label={`📈 ${t('profile.progress')}`} />
-        <TabBtn id="history" label={`📋 ${t('profile.history')}`} />
+        {renderTab({id:'trophies',label:`🏆 ${t('profile.trophies')}`})}
+        {renderTab({id:'stats',label:`📈 ${t('profile.progress')}`})}
+        {renderTab({id:'history',label:`📋 ${t('profile.history')}`})}
       </div>
 
       {tab === 'trophies' && <TrophyRoom />}
@@ -1313,7 +1317,7 @@ const Profile = () => {
 
       {/* Data Management */}
       <div className="glass-card animate-fade-up" style={{ padding: '1.5rem', marginBottom: '1.25rem' }}>
-        <div className="section-label">{t('profile.data_backup')}</div>
+        <div className="section-label">{t('profile.data_backup')}</div><label>{lang==='ar'?'طريقة الاستعادة':'Restore mode'}<select value={importMode} onChange={e=>setImportMode(e.target.value as 'merge'|'replace')}><option value="merge">{lang==='ar'?'دمج: احتفظ بالأيام الموجودة':'Merge: keep existing days'}</option><option value="replace">{lang==='ar'?'استبدال بيانات المستخدم الحالي':'Replace current profile data'}</option></select></label><p className="muted">{lang==='ar'?'لا تشمل النسخة مفتاح USDA أو قفل البصمة أو أذونات الجهاز.':'Backups exclude your USDA key, biometric lock and device permissions.'}</p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           <button onClick={handleExport} disabled={!!exportBusy || importBusy} className="btn-secondary" style={{ width: '100%', padding: '1rem' }}>
             {exportBusy === 'json' ? <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> : <Download size={18} />} {t('profile.export_json')}
