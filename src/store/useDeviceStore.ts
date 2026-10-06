@@ -1,3 +1,4 @@
+import { durableStorage } from '../db/preferences';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
@@ -37,7 +38,7 @@ interface DeviceState {
   startSession: () => void;
   endSession: () => DeviceSession | null;
   clearSessions: () => void;
-  importData: (data: any) => void;
+  importData: (data: { sessions?: DeviceSession[] }) => void;
 }
 
 export const HR_ZONES: Omit<HRZone, 'minutes'>[] = [
@@ -111,7 +112,7 @@ export const useDeviceStore = create<DeviceState>()(
         const zones = calculateZones(hrData);
 
         const session: DeviceSession = {
-          id: Math.random().toString(36).substring(2, 9),
+          id: crypto.randomUUID(),
           date: state.sessionStart,
           deviceName: state.deviceName || 'Unknown',
           duration,
@@ -137,7 +138,7 @@ export const useDeviceStore = create<DeviceState>()(
       importData: (data) => set({ sessions: data.sessions || [] }),
     }),
     {
-      name: 'omnibody-device-storage',
+      storage: durableStorage, name: 'omnibody-device-storage',
       // Only the historical session log should survive a restart — live
       // connection state (isConnected/deviceId/currentHR/liveHRData) reflects
       // a real BLE link that's gone the moment the app process is killed.

@@ -1,3 +1,4 @@
+import type { TranslationKey } from '../i18n/translations';
 import { useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -62,8 +63,8 @@ const Walkthrough = () => {
   // replay from Profile would resume wherever the last session left off.
   useEffect(() => {
     if (isOpen) {
-      setStepIndex(0);
-      setRect(null);
+      const frame = requestAnimationFrame(() => { setStepIndex(0); setRect(null); });
+      return () => cancelAnimationFrame(frame);
     }
   }, [isOpen]);
 
@@ -267,10 +268,10 @@ const Walkthrough = () => {
         </div>
 
         <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.05rem', fontWeight: 700, color: 'var(--color-text)', margin: '0 0 0.4rem' }}>
-          {t(step.titleKey as any)}
+          {t(step.titleKey as TranslationKey)}
         </h3>
         <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', lineHeight: 1.4, margin: '0 0 1rem' }}>
-          {t(step.descKey as any)}
+          {t(step.descKey as TranslationKey)}
         </p>
 
         <button onClick={handleNext} className="btn-primary" style={{ width: '100%', padding: '0.6rem', fontSize: '0.85rem' }}>

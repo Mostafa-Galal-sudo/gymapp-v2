@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Zap, TrendingUp, AlertTriangle, Dumbbell, Droplet,
   ChevronRight, Activity, Share2, Accessibility, Minus, Plus, Brain,
-  Sparkles, Trophy
+  Trophy
 } from 'lucide-react';
 import { format, startOfDay } from 'date-fns';
 import html2canvas from 'html2canvas';
@@ -351,7 +351,7 @@ const Dashboard = () => {
   // over the last 28 days. Using all-time history here would dilute the
   // "chronic" baseline more and more the longer someone uses the app.
   let acwr = 1.0;
-  const now = Date.now();
+  const [now] = useState(Date.now);
   const DAY_MS = 24 * 60 * 60 * 1000;
   const acuteSessions = history.filter(s => s.date >= now - 7 * DAY_MS);
   const chronicSessions = history.filter(s => s.date >= now - 28 * DAY_MS);

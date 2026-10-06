@@ -1,10 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { App as CapacitorApp } from '@capacitor/app';
 import { useLanguageStore } from './store/useLanguageStore';
 import { useUserStore } from './store/useUserStore';
 import { useOnboardingStore } from './store/useOnboardingStore';
-import { loadAllUserData } from './store/sessionLoader';
+
 import MainLayout from './components/layout/MainLayout';
 import { MigrationGate } from './components/MigrationGate';
 import LanguageGate from './components/LanguageGate';
@@ -12,14 +12,18 @@ import AppLockGate from './components/AppLockGate';
 import Walkthrough from './components/Walkthrough';
 
 import Auth from './pages/Auth';
-import Dashboard from './pages/Dashboard';
-import Workout from './pages/Workout';
-import Nutrition from './pages/Nutrition';
-import Profile from './pages/Profile';
-import CalendarPage from './pages/Calendar';
-import DeviceLive from './pages/DeviceLive';
-import MuscleMapPage from './pages/MuscleMapPage';
-import ProgressPage from './pages/Progress';
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Workout = lazy(() => import('./pages/Workout'));
+const Nutrition = lazy(() => import('./pages/Nutrition'));
+const Profile = lazy(() => import('./pages/Profile'));
+const CalendarPage = lazy(() => import('./pages/Calendar'));
+const DeviceLive = lazy(() => import('./pages/DeviceLive'));
+const MuscleMapPage = lazy(() => import('./pages/MuscleMapPage'));
+const ProgressPage = lazy(() => import('./pages/Progress'));
+
+const Today = lazy(() => import('./pages/Today'));
+const Measurements = lazy(() => import('./pages/Measurements'));
+const Insights = lazy(() => import('./pages/Insights'));
 
 function AppRouter() {
   const navigate = useNavigate();
@@ -27,7 +31,9 @@ function AppRouter() {
 
   useEffect(() => {
     const backListener = CapacitorApp.addListener('backButton', () => {
-      // Allow back navigation to Dashboard, otherwise exit
+      const dialog = document.querySelector('dialog[open]');
+      if (dialog) { dialog.dispatchEvent(new Event('cancel', { cancelable: true })); return; }
+      if (document.activeElement instanceof HTMLElement && ['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) { document.activeElement.blur(); return; }
       if (location.pathname === '/dashboard' || location.pathname === '/' || location.pathname === '/auth') {
         CapacitorApp.exitApp();
       } else {
@@ -42,19 +48,23 @@ function AppRouter() {
   }, [location.pathname, navigate]);
 
   return (
-    <Routes>
+    <Suspense fallback={<div className="skeleton" role="status">Loading / جار التحميل…</div>}><Routes>
       <Route path="/" element={<MainLayout />}>
         <Route index element={<Navigate to="/dashboard" replace />} />
-        <Route path="dashboard" element={<Dashboard />} />
+        <Route path="dashboard" element={<Today />} />
+        <Route path="daily-detail" element={<Dashboard />} />
         <Route path="workout" element={<Workout />} />
         <Route path="calendar" element={<CalendarPage />} />
         <Route path="nutrition" element={<Nutrition />} />
         <Route path="profile" element={<Profile />} />
         <Route path="muscles" element={<MuscleMapPage />} />
         <Route path="device-live" element={<DeviceLive />} />
+        <Route path="measurements" element={<Measurements />} />
+        <Route path="insights" element={<Insights />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
         <Route path="progress" element={<ProgressPage />} />
       </Route>
-    </Routes>
+    </Routes></Suspense>
   );
 }
 
@@ -69,16 +79,7 @@ function App() {
     document.documentElement.lang = lang;
   }, [lang]);
 
-  useEffect(() => {
-    const storedId = localStorage.getItem('omni_active_user');
-    if (storedId) {
-      // Hydrates the user profile AND every secondary store (workouts,
-      // nutrition, gamification, exercises). Previously this called
-      // loadUser() alone, so auto-login left workouts/nutrition/XP/badges/
-      // custom exercises empty until the user manually logged out and back in.
-      loadAllUserData(storedId);
-    }
-  }, []);
+
 
   useEffect(() => {
     if (!isAuthenticated || hasSeenWalkthrough) return;

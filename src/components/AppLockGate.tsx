@@ -1,32 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
-import { Fingerprint, Lock, ShieldOff } from 'lucide-react';
+import { Fingerprint, Lock } from 'lucide-react';
 import { useAppLockStore } from '../store/useAppLockStore';
 import { useT } from '../hooks/useT';
-
-// Error codes where retrying the same biometric prompt can never succeed —
-// e.g. the user removed their fingerprint/Face ID, or the device has no
-// passcode at all. Without an escape hatch here, a user who hits one of
-// these after enabling the lock would be permanently locked out of the app.
-const UNRECOVERABLE_CODES = new Set([
-  'passcodeNotSet', 'biometryNotAvailable', 'biometryNotEnrolled', 'noDeviceCredential',
-]);
-const MAX_RETRY_FAILURES = 3;
 
 const AppLockGate = ({ children }: { children: React.ReactNode }) => {
   const t = useT();
   const enabled = useAppLockStore(s => s.enabled);
-  const setLockEnabled = useAppLockStore(s => s.setEnabled);
   const isNative = Capacitor.isNativePlatform();
   // Locked by default whenever the feature is on — the very first render
   // after a cold start (or a resume) must always require authentication.
   const [unlocked, setUnlocked] = useState(!enabled || !isNative);
   const [authenticating, setAuthenticating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showEscapeHatch, setShowEscapeHatch] = useState(false);
   const attemptedRef = useRef(false);
-  const failureCountRef = useRef(0);
 
   const attemptUnlock = async () => {
     if (!isNative) { setUnlocked(true); return; }
@@ -42,8 +30,6 @@ const AppLockGate = ({ children }: { children: React.ReactNode }) => {
         androidSubtitle: t('lock.android_subtitle'),
       });
       setUnlocked(true);
-      failureCountRef.current = 0;
-      setShowEscapeHatch(false);
     } catch (err) {
       // userCancel / systemCancel just means they dismissed the prompt —
       // no need to show a scary error or count it as a failure for that.
@@ -53,18 +39,9 @@ const AppLockGate = ({ children }: { children: React.ReactNode }) => {
         return;
       }
       setError(t('lock.failed'));
-      failureCountRef.current += 1;
-      if ((code && UNRECOVERABLE_CODES.has(code)) || failureCountRef.current >= MAX_RETRY_FAILURES) {
-        setShowEscapeHatch(true);
-      }
     } finally {
       setAuthenticating(false);
     }
-  };
-
-  const disableLockAndEnter = () => {
-    setLockEnabled(false);
-    setUnlocked(true);
   };
 
   // Prompt automatically once, right after the app becomes locked.
@@ -73,7 +50,7 @@ const AppLockGate = ({ children }: { children: React.ReactNode }) => {
       attemptedRef.current = true;
       attemptUnlock();
     }
-    if (unlocked) { attemptedRef.current = false; failureCountRef.current = 0; }
+    if (unlocked) { attemptedRef.current = false; }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, isNative, unlocked]);
 
@@ -87,7 +64,7 @@ const AppLockGate = ({ children }: { children: React.ReactNode }) => {
     return () => { listener.then(l => l.remove()); };
   }, [enabled, isNative]);
 
-  if (!enabled || !isNative) return <>{children}</>;
+  if (!enabled || !isNative) return <><div inert={!unlocked}>{children}</div></>;
 
   return (
     <>
@@ -131,21 +108,7 @@ const AppLockGate = ({ children }: { children: React.ReactNode }) => {
             <Fingerprint size={18} />
             {authenticating ? t('common.loading') : t('lock.unlock_button')}
           </button>
-          {showEscapeHatch && (
-            <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', maxWidth: 260 }}>{t('lock.escape_hint')}</div>
-              <button
-                onClick={disableLockAndEnter}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem',
-                  background: 'transparent', border: '1px solid var(--magenta)', borderRadius: 'var(--radius-md)',
-                  color: 'var(--magenta)', fontSize: '0.75rem', fontWeight: 600,
-                }}
-              >
-                <ShieldOff size={14} /> {t('lock.escape_button')}
-              </button>
-            </div>
-          )}
+
         </div>
       )}
     </>

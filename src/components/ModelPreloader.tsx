@@ -1,0 +1,2 @@
+import { useEffect } from 'react';
+export function ModelPreloader(){useEffect(()=>{let cancelled=false;const timer=setTimeout(()=>{const connection=(navigator as Navigator&{connection?:{saveData?:boolean;effectiveType?:string}}).connection;if(cancelled||document.hidden||connection?.saveData||connection?.effectiveType==='2g')return;void import('../services/modelCache').then(m=>cancelled?undefined:m.preloadModels()).catch(()=>undefined);},5000);return()=>{cancelled=true;clearTimeout(timer);};},[]);return null;}

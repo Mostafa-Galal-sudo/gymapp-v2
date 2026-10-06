@@ -1,3 +1,4 @@
+import { durableStorage } from '../db/preferences';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
@@ -19,7 +20,7 @@ export const useOnboardingStore = create<OnboardingState>()(
       closeWalkthrough: () => set({ isWalkthroughOpen: false }),
     }),
     {
-      name: 'omnibody-onboarding',
+      storage: durableStorage, name: 'omnibody-onboarding',
       // Only persist the "seen" flag — isWalkthroughOpen is transient UI
       // state and should never be restored as "open" on a fresh app load.
       partialize: (state) => ({ hasSeenWalkthrough: state.hasSeenWalkthrough }),

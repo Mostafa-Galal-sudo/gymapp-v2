@@ -3,10 +3,16 @@ import { startOfDay, subDays } from 'date-fns';
 import db, { type Recipe } from '../db/db';
 import { useUserStore } from './useUserStore';
 import { useGamificationStore } from './useGamificationStore';
-import { FOOD_DATABASE } from '../data/foods';
+import { foodSnapshot } from '../food/snapshot';
+import type { Food, Nutrients } from '../food/model';
 import { scheduleWaterReminders, cancelWaterReminders } from '../services/notificationService';
 
 export interface LoggedFood {
+  id?: string;
+  nutrients?: Nutrients;
+  source?: Food['source'];
+  sourceId?: string;
+  loggedAt?: number;
   foodId: string;
   name: string;
   nameAr?: string;
@@ -43,6 +49,8 @@ export interface Meal {
 }
 
 export interface NutritionDay {
+  supplementPlan?: Record<string, { name: string; doses: number }>;
+  targets?: Record<string, number>;
   date: number; // Start of day timestamp
   meals: Meal[];
   waterMl: number;
@@ -71,12 +79,12 @@ interface NutritionState {
   getTodayLog: () => NutritionDay;
   getLogForDate: (date: number) => NutritionDay;
   loadUserRecipes: (userId: string) => Promise<void>;
-  saveRecipe: (name: string, items: { foodId: string; amount: number }[]) => Promise<void>;
+  saveRecipe: (name: string, items: Recipe['items']) => Promise<void>;
   deleteRecipe: (id: string) => Promise<void>;
   logRecipe: (date: number, mealType: string, recipeId: string) => Promise<void>;
 }
 
-const generateId = () => Math.random().toString(36).substring(2, 9);
+const generateId = () => crypto.randomUUID();
 
 const saveToDb = async (userId: string, date: number, dayLog: NutritionDay) => {
   await db.daily_logs.put({
@@ -85,7 +93,9 @@ const saveToDb = async (userId: string, date: number, dayLog: NutritionDay) => {
     date,
     meals: dayLog.meals,
     waterMl: dayLog.waterMl,
+    supplementPlan: dayLog.supplementPlan,
     supplementsTaken: dayLog.supplementsTaken || {}
+    ,targets: dayLog.targets || useNutritionStore.getState().getTargets()
   });
 };
 
@@ -166,75 +176,9 @@ export const useNutritionStore = create<NutritionState>()(
       const logs = await db.daily_logs.where('userId').equals(userId).toArray();
       const historyMap: Record<number, NutritionDay> = {};
 
-      // Build a quick lookup map for O(1) food access
-      const foodLookup = new Map(FOOD_DATABASE.map(f => [f.id, f]));
-
-      logs.forEach(log => {
-        const enrichedMeals = log.meals.map(meal => ({
-          ...meal,
-          foods: meal.foods.map(lf => {
-            // Skip if already has micros
-            if (lf.fiber != null || lf.sodium != null || lf.potassium != null) return lf;
-
-            // Macro-based estimation (same formulas as handleAdd)
-            const p = lf.protein, c = lf.carbs, f = lf.fats, cal = lf.calories;
-            const est = {
-              fiber:     parseFloat((c * 0.02  + p * 0.005).toFixed(1)),
-              sugar:     parseFloat((c * 0.05).toFixed(1)),
-              sodium:    Math.round(p * 6    + c * 0.5  + cal * 0.08),
-              potassium: Math.round(p * 12   + c * 1.5  + f   * 0.5),
-              iron:      parseFloat((p * 0.04 + c * 0.008).toFixed(1)),
-              calcium:   Math.round(p * 0.6  + c * 0.1  + f   * 0.2),
-              vitaminC:  Math.round(c * 0.15),
-              vitaminA:  Math.round(f * 0.8),
-              vitaminD:  parseFloat((f * 0.05).toFixed(1)),
-              magnesium: Math.round(p * 0.8  + c * 0.15),
-              zinc:      parseFloat((p * 0.03).toFixed(1)),
-              phosphorus: Math.round(p * 4    + c * 0.3),
-              vitaminE:  parseFloat((f * 0.02).toFixed(1)),
-              vitaminB6: parseFloat((p * 0.006).toFixed(2)),
-              folate:    Math.round(c * 0.2),
-            };
-
-            // Try to use DB values if food is found (more accurate)
-            const src = foodLookup.get(lf.foodId);
-            if (src) {
-              const ratio = lf.amount / src.servingSize;
-              return {
-                ...lf,
-                fiber:     src.fiber     != null ? parseFloat((src.fiber     * ratio).toFixed(1)) : est.fiber,
-                sugar:     src.sugar     != null ? parseFloat((src.sugar     * ratio).toFixed(1)) : est.sugar,
-                sodium:    src.sodium    != null ? Math.round(src.sodium    * ratio)              : est.sodium,
-                potassium: src.potassium != null ? Math.round(src.potassium * ratio)              : est.potassium,
-                iron:      src.iron      != null ? parseFloat((src.iron      * ratio).toFixed(1)) : est.iron,
-                calcium:   src.calcium   != null ? Math.round(src.calcium   * ratio)              : est.calcium,
-                vitaminA:  src.vitaminA  != null ? Math.round(src.vitaminA  * ratio)              : est.vitaminA,
-                vitaminC:  src.vitaminC  != null ? Math.round(src.vitaminC  * ratio)              : est.vitaminC,
-                vitaminD:  src.vitaminD  != null ? Math.round(src.vitaminD  * ratio)              : est.vitaminD,
-                vitaminB12: src.vitaminB12 != null ? parseFloat((src.vitaminB12 * ratio).toFixed(1)) : undefined,
-                magnesium: src.magnesium != null ? Math.round(src.magnesium * ratio)              : est.magnesium,
-                zinc:      src.zinc      != null ? parseFloat((src.zinc      * ratio).toFixed(1)) : est.zinc,
-                phosphorus: src.phosphorus != null ? Math.round(src.phosphorus * ratio)           : est.phosphorus,
-                selenium:  src.selenium  != null ? parseFloat((src.selenium  * ratio).toFixed(1)) : undefined,
-                vitaminE:  src.vitaminE  != null ? parseFloat((src.vitaminE  * ratio).toFixed(1)) : est.vitaminE,
-                vitaminK:  src.vitaminK  != null ? parseFloat((src.vitaminK  * ratio).toFixed(1)) : undefined,
-                vitaminB6: src.vitaminB6 != null ? parseFloat((src.vitaminB6 * ratio).toFixed(2)) : est.vitaminB6,
-                folate:    src.folate    != null ? Math.round(src.folate    * ratio)              : est.folate,
-              };
-            }
-
-            // Food not found in DB — use macro estimates directly
-            return { ...lf, ...est };
-          })
-        }));
-
-        historyMap[log.date] = {
-          date: log.date,
-          meals: enrichedMeals,
-          waterMl: log.waterMl,
-          supplementsTaken: log.supplementsTaken
-        };
-      });
+      for (const log of logs) historyMap[log.date] = {
+        date: log.date, meals: log.meals, waterMl: log.waterMl, supplementsTaken: log.supplementsTaken, targets: log.targets, supplementPlan: log.supplementPlan,
+      };
       set({ history: historyMap });
     },
 
@@ -254,6 +198,8 @@ export const useNutritionStore = create<NutritionState>()(
         });
         return {
           date: targetDate,
+          targets: get().getTargets(),
+          supplementPlan: Object.fromEntries(useUserStore.getState().supplements.map(s=>[s.id,{name:s.name,doses:s.taken.length}])),
           waterMl: 0,
           meals: [
             emptyMeal('Breakfast'),
@@ -271,15 +217,15 @@ export const useNutritionStore = create<NutritionState>()(
 
     addFood: async (date, mealType, food) => {
       const today = startOfDay(new Date(date)).getTime();
-      const dayLog = get().history[today] || get().getLogForDate(today);
+      const dayLog = structuredClone(get().history[today] || get().getLogForDate(today));
       
       let meal = dayLog.meals.find(m => m.type === mealType);
       if (!meal) {
-        meal = { id: generateId(), type: mealType as any, foods: [] };
+        meal = { id: generateId(), type: mealType as Meal['type'], foods: [] };
         dayLog.meals.push(meal);
       }
       
-      meal.foods.push(food);
+      meal.foods.push({ ...structuredClone(food), id: crypto.randomUUID() });
       
       const newLog = { ...dayLog, meals: [...dayLog.meals] };
       set((state) => ({
@@ -318,7 +264,7 @@ export const useNutritionStore = create<NutritionState>()(
 
       const meals = dayLog.meals.map(m => {
         if (m.id !== mealId) return m;
-        return { ...m, foods: m.foods.filter(f => f.foodId !== foodId) };
+        return { ...m, foods: m.foods.filter(f => f.id !== foodId) };
       });
 
       const newLog = { ...dayLog, meals };
@@ -332,7 +278,7 @@ export const useNutritionStore = create<NutritionState>()(
 
     addWater: async (date, amount) => {
       const today = startOfDay(new Date(date)).getTime();
-      const dayLog = get().history[today] || get().getLogForDate(today);
+      const dayLog = structuredClone(get().history[today] || get().getLogForDate(today));
       
       const newLog = { ...dayLog, waterMl: dayLog.waterMl + amount };
       set((state) => ({
@@ -370,7 +316,7 @@ export const useNutritionStore = create<NutritionState>()(
 
     toggleSupplement: async (date, supId, doseIndex) => {
       const today = startOfDay(new Date(date)).getTime();
-      const dayLog = get().history[today] || get().getLogForDate(today);
+      const dayLog = structuredClone(get().history[today] || get().getLogForDate(today));
       
       const supsTaken = { ...(dayLog.supplementsTaken || {}) };
       const doses = [...(supsTaken[supId] || [])];
@@ -400,7 +346,7 @@ export const useNutritionStore = create<NutritionState>()(
         ].some(v => v != null && v > 0);
 
         if (hasNutrients) {
-          let supplementsMeal = meals.find(m => m.type === 'Supplements');
+          const supplementsMeal = meals.find(m => m.type === 'Supplements');
           if (!doses[doseIndex]) {
             // Turned OFF — remove this dose's contribution if present
             if (supplementsMeal) {
@@ -411,7 +357,9 @@ export const useNutritionStore = create<NutritionState>()(
           } else {
             // Turned ON — add (or replace) this dose's contribution
             const loggedSupplement: LoggedFood = {
-              foodId: entryId,
+              id: crypto.randomUUID(), foodId: entryId,
+              source: 'custom', loggedAt: Date.now(),
+              nutrients: Object.fromEntries(Object.entries(supplement).filter(([key,value]) => ['calories','protein','carbs','fats','vitaminD','vitaminB12','vitaminC','vitaminE','magnesium','zinc','calcium','iron'].includes(key) && typeof value === 'number').map(([key,value]) => [key, key === 'vitaminD' ? Number(value) / 40 : value])),
               name: `${supplement.name} (${supplement.dose})`,
               amount: 1,
               unit: 'dose',
@@ -501,7 +449,7 @@ export const useNutritionStore = create<NutritionState>()(
 
     resetMeal: async (date, mealType) => {
       const today = startOfDay(new Date(date)).getTime();
-      const dayLog = get().history[today] || get().getLogForDate(today);
+      const dayLog = structuredClone(get().history[today] || get().getLogForDate(today));
       
       const meals = dayLog.meals.map(m => {
         if (m.type === mealType) return { ...m, foods: [] };
@@ -517,7 +465,7 @@ export const useNutritionStore = create<NutritionState>()(
 
     resetWater: async (date) => {
       const today = startOfDay(new Date(date)).getTime();
-      const dayLog = get().history[today] || get().getLogForDate(today);
+      const dayLog = structuredClone(get().history[today] || get().getLogForDate(today));
       
       const newLog = { ...dayLog, waterMl: 0 };
       set((state) => ({ history: { ...state.history, [today]: newLog } }));
@@ -533,7 +481,7 @@ export const useNutritionStore = create<NutritionState>()(
 
     resetSupplements: async (date) => {
       const today = startOfDay(new Date(date)).getTime();
-      const dayLog = get().history[today] || get().getLogForDate(today);
+      const dayLog = structuredClone(get().history[today] || get().getLogForDate(today));
       
       // Also clear the Supplements meal bucket so its nutrient contributions
       // don't linger in the day's totals after the checklist is reset.
@@ -581,50 +529,16 @@ export const useNutritionStore = create<NutritionState>()(
       if (!recipe) return;
 
       const today = startOfDay(new Date(date)).getTime();
-      const dayLog = get().history[today] || get().getLogForDate(today);
-      const foodLookup = new Map(FOOD_DATABASE.map(f => [f.id, f]));
-
-      let meal = dayLog.meals.find(m => m.type === mealType);
-      if (!meal) {
-        meal = { id: generateId(), type: mealType as any, foods: [] };
-        dayLog.meals.push(meal);
-      }
-
-      recipe.items.forEach(({ foodId, amount }) => {
-        const src = foodLookup.get(foodId);
-        if (!src) return;
-        const ratio = amount / src.servingSize;
-        const round1 = (n: number) => parseFloat(n.toFixed(1));
-
-        const logged: LoggedFood = {
-          foodId: src.id, name: src.name, nameAr: src.nameAr,
-          amount, unit: src.servingUnit,
-          calories: Math.round(src.calories * ratio),
-          protein: round1(src.protein * ratio),
-          carbs: round1(src.carbs * ratio),
-          fats: round1(src.fats * ratio),
-          fiber: src.fiber != null ? round1(src.fiber * ratio) : undefined,
-          sugar: src.sugar != null ? round1(src.sugar * ratio) : undefined,
-          sodium: src.sodium != null ? Math.round(src.sodium * ratio) : undefined,
-          potassium: src.potassium != null ? Math.round(src.potassium * ratio) : undefined,
-          iron: src.iron != null ? round1(src.iron * ratio) : undefined,
-          calcium: src.calcium != null ? Math.round(src.calcium * ratio) : undefined,
-          magnesium: src.magnesium != null ? Math.round(src.magnesium * ratio) : undefined,
-          zinc: src.zinc != null ? round1(src.zinc * ratio) : undefined,
-          phosphorus: src.phosphorus != null ? Math.round(src.phosphorus * ratio) : undefined,
-          selenium: src.selenium != null ? round1(src.selenium * ratio) : undefined,
-          vitaminA: src.vitaminA != null ? Math.round(src.vitaminA * ratio) : undefined,
-          vitaminC: src.vitaminC != null ? Math.round(src.vitaminC * ratio) : undefined,
-          vitaminD: src.vitaminD != null ? Math.round(src.vitaminD * ratio) : undefined,
-          vitaminB12: src.vitaminB12 != null ? round1(src.vitaminB12 * ratio) : undefined,
-          vitaminE: src.vitaminE != null ? round1(src.vitaminE * ratio) : undefined,
-          vitaminK: src.vitaminK != null ? round1(src.vitaminK * ratio) : undefined,
-          vitaminB6: src.vitaminB6 != null ? parseFloat((src.vitaminB6 * ratio).toFixed(2)) : undefined,
-          folate: src.folate != null ? Math.round(src.folate * ratio) : undefined,
-        };
-        meal!.foods.push(logged);
-      });
-
+      const dayLog = structuredClone(get().history[today] || get().getLogForDate(today));
+      const meal = dayLog.meals.find(m => m.type === mealType);
+      if (!meal) throw new Error('Unknown meal');
+      const foods = await Promise.all(recipe.items.map(async item => {
+        if (item.snapshot) return { ...structuredClone(item.snapshot), id: crypto.randomUUID() };
+        const source = await db.foods.get(item.foodId);
+        if (!source) throw new Error('Recipe food is unavailable. Edit this recipe before logging it.');
+        return foodSnapshot(source, item.amount);
+      }));
+      meal.foods.push(...foods);
       const newLog = { ...dayLog, meals: [...dayLog.meals] };
       set((state) => ({ history: { ...state.history, [today]: newLog } }));
 

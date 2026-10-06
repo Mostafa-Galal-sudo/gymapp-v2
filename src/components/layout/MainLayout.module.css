@@ -1,105 +1,122 @@
 .layout {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
   position: relative;
   z-index: 1;
+  display: flex;
+  min-height: 100dvh;
+  padding-top: env(safe-area-inset-top, 0px);
+  flex-direction: column;
+  background: #050505;
 }
 
 .main {
-  flex: 1;
-  overflow-y: auto;
   display: flex;
-  flex-direction: column;
   min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow-y: auto;
 }
 
-/* ── Bottom Nav ── */
 .nav {
   position: fixed;
+  right: 0;
   bottom: 0;
   left: 0;
-  right: 0;
   z-index: 100;
   display: flex;
   align-items: stretch;
-  justify-content: space-around;
-  background: rgba(2, 4, 8, 0.85);
-  backdrop-filter: blur(24px) saturate(1.5);
-  -webkit-backdrop-filter: blur(24px) saturate(1.5);
-  border-top: 1px solid rgba(0, 240, 255, 0.1);
   padding-bottom: env(safe-area-inset-bottom, 0px);
-  box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.6);
-  /* fix: allow nav to shrink items to fit 6 */
   overflow: hidden;
+  border-top: 2px solid #f5da0a;
+  background: #050505;
 }
 
 .navItem {
+  position: relative;
   display: flex;
+  min-width: 0;
+  min-height: 66px;
+  padding: 8px 3px 7px;
+  flex: 1;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  /* fix: بدل 1rem → 0.25rem عشان الـ 6 items تتسع */
-  padding: 0.6rem 0.25rem;
-  flex: 1;
-  min-width: 0;
-  /* مهم عشان flex items تتضغط */
-  cursor: pointer;
-  border: none;
-  background: none;
-  text-decoration: none;
-  color: rgba(74, 112, 128, 0.8);
-  font-family: 'Inter', sans-serif;
-  /* fix: صغّر الفونت شوية */
-  font-size: 0.58rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  position: relative;
-  /* fix: منع الـ text من الـ overflow */
+  gap: 3px;
   overflow: hidden;
+  border-inline-end: 1px solid #272724;
+  color: #8e8c84;
+  background: #050505;
+  font-family: "Archivo Variable", Arial, sans-serif;
+  font-size: 0.68rem;
+  font-weight: 650;
+  text-decoration: none;
   text-overflow: ellipsis;
   white-space: nowrap;
+  transition:
+    color 150ms ease,
+    background 150ms ease;
+}
+
+.navItem:last-child {
+  border-inline-end: 0;
 }
 
 .navItem:active {
-  transform: scale(0.94);
+  transform: none;
 }
 
 .navItem.active {
-  color: #00F0FF;
-  text-shadow: 0 0 12px rgba(0, 240, 255, 0.6);
+  color: #050505;
+  background: #f5da0a;
 }
 
 .navItem.active::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 10%;
-  right: 10%;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, #00F0FF, transparent);
-  border-radius: 0 0 4px 4px;
-  box-shadow: 0 0 8px rgba(0, 240, 255, 0.8);
+  display: none;
 }
 
 .navIcon {
   position: relative;
   display: flex;
+  width: 34px;
+  height: 30px;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  /* fix: صغّر الـ icon container شوية */
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
 }
 
 .navItem.active .navIcon::after {
-  content: '';
-  position: absolute;
-  inset: -4px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(0, 240, 255, 0.15) 0%, transparent 70%);
+  display: none;
+}
+
+.navIcon svg {
+  width: 21px;
+  height: 21px;
+  stroke-width: 2.2;
+}
+
+@media (min-width: 900px) {
+  .layout {
+    padding-inline-start: 88px;
+  }
+
+  .nav {
+    top: 0;
+    right: auto;
+    width: 88px;
+    padding-top: calc(18px + env(safe-area-inset-top, 0px));
+    padding-bottom: 18px;
+    flex-direction: column;
+    border-top: 0;
+    border-inline-end: 2px solid #f5da0a;
+  }
+
+  .navItem {
+    min-height: 80px;
+    flex: 0 0 auto;
+    border-inline-end: 0;
+    border-bottom: 1px solid #272724;
+  }
+}
+
+:global(html[dir="rtl"]) .navItem {
+  font-family: "Noto Sans Arabic Variable", Tahoma, sans-serif;
 }
