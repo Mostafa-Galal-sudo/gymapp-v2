@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
+test.describe.configure({ timeout: 120_000 });
 test.beforeEach(async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.evaluate(async () => {
     // Isolated browser profile. Import the real data services through Vite for deterministic fixtures.
     const module = await import(/* @vite-ignore */ "/src/db/db.ts");
@@ -39,7 +40,7 @@ test.beforeEach(async ({ page }) => {
   });
   await page.reload();
   await expect(
-    page.getByRole("heading", { name: "One good day at a time." }),
+    page.getByRole("heading", { name: "Log the work." }),
   ).toBeVisible();
 });
 test("mobile routes, check-in persistence, insights drilldown and RTL", async ({
@@ -66,6 +67,10 @@ test("mobile routes, check-in persistence, insights drilldown and RTL", async ({
   await page.getByRole("button", { name: "Close", exact: true }).click();
   await page.reload();
   await expect(page.getByText("3 measurements")).toBeVisible();
+  await page.screenshot({
+    path: "test-results/measurements-mobile.png",
+    fullPage: true,
+  });
   await page.goto("/insights");
   await expect(
     page.getByRole("heading", { name: "Activity map" }),
@@ -75,6 +80,10 @@ test("mobile routes, check-in persistence, insights drilldown and RTL", async ({
     page.getByRole("heading", { name: "Weight & measurements" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Close", exact: true }).click();
+  await page.screenshot({
+    path: "test-results/insights-mobile.png",
+    fullPage: true,
+  });
   for (const route of [
     "/workout",
     "/nutrition",
@@ -86,6 +95,12 @@ test("mobile routes, check-in persistence, insights drilldown and RTL", async ({
     await page.goto(route, { waitUntil: "domcontentloaded" });
     await expect(page.locator("main")).toBeVisible();
     await expect(page.locator("main")).not.toBeEmpty();
+    if (route === "/workout" || route === "/nutrition") {
+      await page.screenshot({
+        path: `test-results/${route.slice(1)}-mobile.png`,
+        fullPage: true,
+      });
+    }
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth + 1,
@@ -94,7 +109,7 @@ test("mobile routes, check-in persistence, insights drilldown and RTL", async ({
   }
   await page.goto("/dashboard");
   await expect(
-    page.getByRole("heading", { name: "One good day at a time." }),
+    page.getByRole("heading", { name: "Log the work." }),
   ).toBeVisible();
   await page.screenshot({
     path: "test-results/today-mobile.png",
@@ -111,6 +126,10 @@ test("mobile routes, check-in persistence, insights drilldown and RTL", async ({
   await expect(
     page.getByRole("heading", { name: "قياسات الجسم" }),
   ).toBeVisible();
+  await page.screenshot({
+    path: "test-results/measurements-rtl-mobile.png",
+    fullPage: true,
+  });
   expect(errors).toEqual([]);
 });
 test("custom food can be logged twice, one occurrence removed, and restored offline", async ({

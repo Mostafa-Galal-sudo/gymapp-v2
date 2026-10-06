@@ -5,6 +5,13 @@ import { useWorkoutStore } from "../store/useWorkoutStore";
 import { useNutritionStore } from "../store/useNutritionStore";
 import { useMeasurementsStore } from "../store/useMeasurementsStore";
 import { useLanguageStore } from "../store/useLanguageStore";
+import {
+  ChartNoAxesCombined,
+  Droplets,
+  Dumbbell,
+  Ruler,
+  Utensils,
+} from "lucide-react";
 export default function Today() {
   const ar = useLanguageStore((s) => s.lang) === "ar",
     profile = useUserStore((s) => s.profile),
@@ -22,108 +29,127 @@ export default function Today() {
   const checkIn = useMeasurementsStore((s) => s.measurements.at(-1));
   return (
     <div className="journal-page">
-      <header className="page-head">
-        <div>
-          <span className="eyebrow">
-            OMNIBODY · {format(new Date(), "EEE, dd MMM")}
-          </span>
-          <h1>{ar ? "يومك، بخطوة واحدة." : "One good day at a time."}</h1>
-          <p>
-            {profile?.name
-              ? `${ar ? "أهلاً" : "Welcome"}, ${profile.name}`
-              : ar
-                ? "مساحتك للتدريب والتقدم"
-                : "Your space to train and progress"}
-          </p>
-        </div>
+      <header className="page-head today-heading">
+        <time dateTime={date}>{format(new Date(), "EEEE, dd MMMM")}</time>
+        <h1>{ar ? "سجّل شغلك." : "Log the work."}</h1>
+        <p>
+          {profile?.name
+            ? ar
+              ? `${profile.name}، هذه أرقامك اليوم.`
+              : `${profile.name}, here is today’s record.`
+            : ar
+              ? "تدريبك وتغذيتك وتقدمك في مكان واحد."
+              : "Training, nutrition and progress in one place."}
+        </p>
       </header>
       <section className="today-hero">
-        <span className="eyebrow">
-          {active
-            ? ar
-              ? "تمرين محفوظ"
-              : "SESSION SAVED"
-            : done.length
+        <div className="today-hero-status">
+          <span>
+            {active
               ? ar
-                ? "أحسنت اليوم"
-                : "TODAY’S TRAINING"
-              : ar
-                ? "خطوتك التالية"
-                : "YOUR NEXT STEP"}
-        </span>
-        <h2>
-          {active
-            ? active.type
-            : plan
-              ? plan.type
+                ? "محفوظ على الجهاز"
+                : "Saved on device"
               : done.length
                 ? ar
-                  ? "تم تسجيل تمرينك"
-                  : "Your workout is in the journal"
+                  ? "مكتمل اليوم"
+                  : "Completed today"
+                : plan
+                  ? ar
+                    ? "في الجدول"
+                    : "On the schedule"
+                  : ar
+                    ? "جاهز للبدء"
+                    : "Ready to start"}
+          </span>
+          <strong>{done.length ? `${done.length}/1` : "00"}</strong>
+        </div>
+        <div className="today-hero-copy">
+          <Dumbbell aria-hidden="true" size={28} strokeWidth={2.5} />
+          <div>
+            <h2>
+              {active
+                ? active.type
+                : plan
+                  ? plan.type
+                  : done.length
+                    ? ar
+                      ? "تم تسجيل تمرينك"
+                      : "Workout logged"
+                    : ar
+                      ? "اختر تمرين اليوم"
+                      : "Choose today’s session"}
+            </h2>
+            <p>
+              {active
+                ? ar
+                  ? "مجموعاتك محفوظة. أكمل من حيث توقفت."
+                  : "Your sets are saved. Continue where you stopped."
+                : done.length
+                  ? ar
+                    ? "تم حفظ كل مجموعة في سجلك."
+                    : "Every completed set is in your record."
+                  : ar
+                    ? "ابدأ وسجّل الوزن والعدات أثناء التمرين."
+                    : "Start, then record weight and reps as you train."}
+            </p>
+          </div>
+        </div>
+        <Link className="today-cta" to="/workout">
+          <span>
+            {active
+              ? ar
+                ? "متابعة التمرين"
+                : "Resume workout"
+              : plan
+                ? ar
+                  ? "عرض تمرين اليوم"
+                  : "View today’s workout"
                 : ar
-                  ? "اختر تمرين اليوم"
-                  : "Make time for your training"}
-        </h2>
-        <p>
-          {active
-            ? ar
-              ? "تابع من حيث توقفت. مجموعاتك محفوظة على جهازك."
-              : "Pick up where you left off. Your sets are saved on this device."
-            : done.length
-              ? ar
-                ? "إنهاء التمرين لا يبدأ تمرين الغد."
-                : "Finishing a workout leaves tomorrow’s plan untouched."
-              : ar
-                ? "سجّل تقدمك، مجموعة تلو الأخرى."
-                : "Build progress, one set at a time."}
-        </p>
-        <Link className="btn" to="/workout">
-          {active
-            ? ar
-              ? "متابعة التمرين"
-              : "Resume workout"
-            : plan
-              ? ar
-                ? "عرض تمرين اليوم"
-                : "View today’s workout"
-              : ar
-                ? "افتح التدريب"
-                : "Open training"}{" "}
-          →
+                  ? "فتح التدريب"
+                  : "Open training"}
+          </span>
+          <small>{ar ? "تمرين" : "Training"}</small>
         </Link>
       </section>
-      <div className="today-grid">
-        <Link className="panel" to="/nutrition">
-          <span className="eyebrow">{ar ? "التغذية" : "NOURISH"}</span>
-          <strong>
-            {log?.meals.reduce((n, m) => n + m.foods.length, 0) || 0}
-          </strong>
-          <p>{ar ? "أطعمة مسجلة" : "foods logged"}</p>
-          <small>{ar ? "أضف وجبتك التالية" : "Log your next meal"} →</small>
+      <div
+        className="today-grid"
+        aria-label={ar ? "ملخص اليوم" : "Today’s summary"}
+      >
+        <Link className="today-stat" to="/nutrition">
+          <Utensils aria-hidden="true" />
+          <div>
+            <span>{ar ? "الأطعمة" : "Food entries"}</span>
+            <strong>
+              {log?.meals.reduce((n, m) => n + m.foods.length, 0) || 0}
+            </strong>
+          </div>
         </Link>
-        <Link className="panel" to="/nutrition">
-          <span className="eyebrow">{ar ? "الماء" : "HYDRATE"}</span>
-          <strong>
-            {log?.waterMl || 0}
-            <small> ml</small>
-          </strong>
-          <p>{ar ? "اليوم" : "today"}</p>
-          <small>{ar ? "سجّل كوباً" : "Add a glass"} →</small>
+        <Link className="today-stat" to="/nutrition">
+          <Droplets aria-hidden="true" />
+          <div>
+            <span>{ar ? "الماء" : "Water"}</span>
+            <strong>
+              {log?.waterMl || 0}
+              <small> ml</small>
+            </strong>
+          </div>
         </Link>
-        <Link className="panel" to="/measurements">
-          <span className="eyebrow">{ar ? "متابعة أسبوعية" : "CHECK IN"}</span>
-          <strong>{checkIn ? format(checkIn.date, "dd MMM") : "—"}</strong>
-          <p>{ar ? "آخر قياس" : "last measurement"}</p>
-          <small>{ar ? "قِس وقارن" : "Measure & compare"} →</small>
+        <Link className="today-stat" to="/measurements">
+          <Ruler aria-hidden="true" />
+          <div>
+            <span>{ar ? "آخر قياس" : "Last check-in"}</span>
+            <strong>{checkIn ? format(checkIn.date, "dd MMM") : "—"}</strong>
+          </div>
         </Link>
-        <Link className="panel" to="/insights">
-          <span className="eyebrow">{ar ? "التقدم" : "REFLECT"}</span>
-          <strong>{history.length}</strong>
-          <p>{ar ? "تمارين في سجلك" : "workouts in your journal"}</p>
-          <small>{ar ? "شاهد الاتجاهات" : "Explore your trends"} →</small>
+        <Link className="today-stat" to="/insights">
+          <ChartNoAxesCombined aria-hidden="true" />
+          <div>
+            <span>{ar ? "التمارين المسجلة" : "Logged workouts"}</span>
+            <strong>{history.length}</strong>
+          </div>
         </Link>
       </div>
-      <nav className="quick-links">
+      <nav className="quick-links utility-rail">
         <Link to="/calendar">{ar ? "الجدول" : "Schedule"}</Link>
         <Link to="/muscles" data-walkthrough="nav-muscles">
           {ar ? "خريطة العضلات" : "Muscle map"}

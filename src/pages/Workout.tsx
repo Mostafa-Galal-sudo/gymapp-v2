@@ -1926,69 +1926,33 @@ const Workout = () => {
         )}
       </div>
 
-      <div
-        className="stagger"
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "0.85rem",
-          marginTop: "2rem",
-        }}
-      >
-        <h2
-          style={{
-            fontFamily: "var(--font-heading)",
-            fontSize: "1.25rem",
-            fontWeight: 700,
-            margin: "1rem 0 0.5rem 0",
-          }}
-        >
-          All Programs
-        </h2>
-        {Object.entries(schedules).map(([name, exerciseIds]) => (
-          <div
-            key={name}
-            className="glass-card animate-fade-up"
-            style={{ padding: "1.25rem", borderLeft: "3px solid var(--cyan)" }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
+      <details className="program-library">
+        <summary>
+          <span>
+            <strong>All Programs</strong>
+            <small>{Object.keys(schedules).length} ready-made sessions</small>
+          </span>
+          <ChevronDown size={20} aria-hidden="true" />
+        </summary>
+        <div className="program-library__list">
+          {Object.entries(schedules).map(([name, exerciseIds]) => (
+            <div key={name} className="program-library__row">
               <div>
-                <div
-                  style={{
-                    fontFamily: "var(--font-heading)",
-                    fontSize: "1.1rem",
-                    fontWeight: 700,
-                  }}
-                >
-                  {name}
-                </div>
-                <div
-                  style={{
-                    fontSize: "0.8rem",
-                    color: "var(--color-text-muted)",
-                    fontFamily: "var(--font-mono)",
-                  }}
-                >
+                <strong>{name}</strong>
+                <small>
                   {exerciseIds.length} {t("workout.exercises")}
-                </div>
+                </small>
               </div>
               <button
                 onClick={() => startSession(name, exerciseIds)}
-                className="btn-primary"
-                style={{ padding: "0.6rem 1.1rem", fontSize: "0.85rem" }}
+                className="btn-secondary"
               >
                 <Play size={16} /> {t("workout.start")}
               </button>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      </details>
 
       {/* Historical Sessions Section */}
       <div
@@ -2035,9 +1999,8 @@ const Workout = () => {
               className="glass-card animate-fade-up"
               style={{
                 padding: "1.25rem",
-                borderLeft: "3px solid var(--magenta)",
-                background:
-                  "linear-gradient(135deg, rgba(255,0,110,0.02) 0%, rgba(0,0,0,0) 100%)",
+                borderInlineStart: "3px solid var(--signal-muted)",
+                background: "var(--ink-raised)",
               }}
             >
               {/* Header */}
